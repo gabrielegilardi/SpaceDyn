@@ -1,0 +1,8 @@
+# MatLab version folder
+MatLab_Code/
+
+# VSC configuration folder
+.vscode/
+
+# Python 
+Python_Code/__pycache__
