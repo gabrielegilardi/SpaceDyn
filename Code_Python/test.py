@@ -1,5 +1,16 @@
+"""
+SpaceDyn - A Toolbox for Space and Mobile Robots.
+
+Copyright (c) 2020 Gabriele Gilardi
+
+Python version of:
+    The SpaceDyn, a MATLAB toolbox for Space and Mobile Robots.
+    (C)1998 The Space Robotics Lab. directed by Kazuya Yoshida,
+    Tohoku University, Japan.
+"""
 
 import numpy as np
+
 import elements_class as element
 import model_class as mc
 from utils import *
@@ -46,9 +57,9 @@ robot.update_elements()
 
 R0=np.array([[ 1.7,  1.7], [-2.0, -2.0 ], [3.4,  3.4 ]])
 Q0=np.array([[-0.1, -0.1], [ 0.23, 0.23], [0.76, 0.76]])
-print(R0,type(R0))
-print(Q0,type(Q0))
-dd = R0 - np.reshape(Q0[:,0], (3,1))
-print(dd,dd.ndim)
+print(R0, type(R0))
+print(Q0, type(Q0))
+dd = R0 - np.reshape(Q0[:, 0], (3, 1))
+print(dd, dd.ndim)
 
 
