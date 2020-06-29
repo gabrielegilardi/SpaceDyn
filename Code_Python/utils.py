@@ -14,38 +14,43 @@ from math import sin, cos, atan2
 
 def rotX(theta=0.0):
     """
+    Rotation about axis X.
     """
-    return np.array([[1.0,         0.0,         0.0],
-                     [0.0, +cos(theta), +sin(theta)],
-                     [0.0, -sin(theta), +cos(theta)]])
+    return np.array([[1.0,            0.0,            0.0],
+                     [0.0,  np.cos(theta),  np.sin(theta)],
+                     [0.0, -np.sin(theta),  np.cos(theta)]])
 
 
 def rotY(theta=0.0):
     """
+    Rotation about axis Y.
     """
-    return np.array([[+cos(theta), 0.0, -sin(theta)],
-                     [        0.0, 1.0,         0.0],
-                     [+sin(theta), 0.0, +cos(theta)]])
+    return np.array([[ np.cos(theta), 0.0, -np.sin(theta)],
+                     [           0.0, 1.0,            0.0],
+                     [ np.sin(theta), 0.0,  np.cos(theta)]])
 
 
 def rotZ(theta=0.0):
     """
+    Rotation about axis Z.
     """
-    return np.array([[+cos(theta), +sin(theta), 0.0],
-                     [-sin(theta), +cos(theta), 0.0],
-                     [        0.0,         0.0, 1.0]])
+    return np.array([[ np.cos(theta),  np.sin(theta), 0.0],
+                     [-np.sin(theta),  np.cos(theta), 0.0],
+                     [           0.0,            0.0, 1.0]])
 
 
 def tilde(a):
     """
+    Converts a vector to the corresponding skew-symmetric matrix.
     """
-    return np.array([[  0.0, -a[2], +a[1]],
-                     [+a[2],   0.0, -a[0]],
-                     [-a[1], +a[0],   0.0]])
+    return np.array([[  0.0, -a[2],  a[1]],
+                     [ a[2],   0.0, -a[0]],
+                     [-a[1],  a[0],   0.0]])
 
 
 def rpy2dc(*args):
     """
+    Converts RPY angles to the corresponding direction cosine matrix.
     """
     if (len(args) == 1):
         rpy = args[0]

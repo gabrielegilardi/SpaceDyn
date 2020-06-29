@@ -13,13 +13,20 @@ import numpy as np
 
 import kinematics as kin
 import dynamics as dyn
-from utils import calc_Momentum
 
 
 def build_cc_SS(bodies):
     """
-    Builds matrices cc and SS (used for base and links).
-    """
+    Builds the matrices cc and SS (connectivity between bodies/joints).
+
+    cc[:, i, k]     Position vector from the centroid of the i-th link to the
+                    k-th joint (own joint when k = i)
+    SS[i, k]        +1 = the i-th body is connected to the k-th body
+                    -1 = i-th body self-connection (always present)
+                     0 = no connection between i-th and k-th bodies
+    
+    Note: position vectors are given wrt the centroid frame.
+    """     
     num_b = len(bodies)
     cc = np.zeros((3, num_b, num_b))
     SS = np.zeros((num_b, num_b), dtype=int)
@@ -33,23 +40,38 @@ def build_cc_SS(bodies):
 
 def build_ce_SE(bodies):
     """
-    Builds matrices ce and SE (used for base and links). Endpoint for the base
-    is always in its centroid.
+    Builds the matrices ce and SE (connectivity between bodies and end-points).
+
+    ce[:, i]        Position vector from the centroid of the i-th link to its
+                    end-point
+    SE[i]           +1 = the i-th body has and end-point
+                     0 = the i-th body does not have and end-point
+
+    Notes:
+    - the base end-point is always in the centroid, thus it is always SE[0] = 1
+       and ce[:, 0] = 0.
+    - position vectors are given wrt the centroid frame.
     """
     num_b = len(bodies)
     ce = np.zeros((3, num_b))
     SE = np.zeros(num_b, dtype=int)
-    SE[0] = 1           # Value for base is always one
+    SE[0] = 1
     for i in range(1, num_b):
-        for k, v in bodies[i].ce.items():
-            ce[:, k] = np.asarray(v)
-            SE[k] = 1
+        v = bodies[i].ce
+        if (len(v) > 0):
+            ce[:, i] = np.asarray(v)
+            SE[i] = 1
     return ce, SE
 
 
 def build_mass_inertia(bodies):
     """
-    Builds the system mass and inertia (used for base and links).
+    Builds the model mass and inertia.
+
+    mass = [mass_1, mass_2, ... ]                       (num_b, )
+    inertia = [inertia_1, inertia_2, ... ]              (3, 3*num_b)
+
+    Note: inertia_1 has indeces [:, 0:3], inertia_2 has indeces [:, 3:6], etc.
     """
     num_b = len(bodies)
     mass = np.zeros(num_b)
@@ -62,13 +84,17 @@ def build_mass_inertia(bodies):
 
 def build_Qe(bodies):
     """
-    Builds endpoint frame (used for base and links). Endpoint frame for the
+    Builds the end-point frame
+    
+    All end-point frame for the
     base is always coincident with the centroid frame.
     """
     num_b = len(bodies)
     Qe = np.zeros((3, num_b))        # Value for base is always zero
     for i in range(1, num_b):
-        Qe[:, i] = bodies[i].Qe
+        v = bodies[i].Qe
+        if (len(v) > 0):
+            Qe[:, i] = np.asarray(v)
     return Qe
 
 
@@ -112,33 +138,54 @@ def build_Qi(joints):
 class model:
 
     # Default values for some of the parameters
-    Gravity = np.array([-9.81, 0.0, 0.0])             # Gravity
-    Ez = np.array([0.0, 0.0, 1.0])                  # Joint z-axis
+    Gravity = np.array([-9.81, 0.0, 0.0])               # Gravity
+    Ez = np.array([0.0, 0.0, 1.0])                      # Joint z-axis
 
-    def __init__(self, bodies, joints=[]):
+    def __init__(self, name=None, bodies=[], joints=[]):
         """
-        Builds model and initialize properties.
+        name        str         Name
+        bodies      num_b       List of bodies
+        joints      num_j       List of joints
         """
-
-        # There is one joint for each link
-        # Bodies are the links plus the base
-        self.num_j = len(joints)                # Number of joints/links
-        self.num_b = self.num_j + 1             # Number of bodies
+        # Bodies = base + links, one joint for each link
+        self.name = name
         self.bodies = bodies
         self.joints = joints
+        self.num_j = len(self.joints)           # Number of joints (links)
+        self.num_b = self.num_j + 1             # Number of bodies
 
-        # Connectivity quantities for bodies (0 to num_b)
-        self.cc, self.SS = build_cc_SS(bodies)  # Between bodies
-        self.ce, self.SE = build_ce_SE(bodies)  # Between bodies and endpoints
+        # Model connectivity
+        self.cc, self.SS = build_cc_SS(self.bodies)     # Body to body/links
+        self.ce, self.SE = build_ce_SE(self.bodies)     # Body to end-point
 
-        # Body properties (0 to num_b)
-        self.mass, self.inertia = build_mass_inertia(bodies)
-        self.Qe = build_Qe(bodies)
+        # Body properties
+        self.mass, self.inertia = build_mass_inertia(self.bodies)
+        self.Qe = build_Qe(self.bodies)
 
-        # Joint properties (0 to num_j)
-        self.BB = build_BB(self.SS[1:, 1:])     # Body pairs connected by each joint
-        self.j_type = build_j_type(joints)
-        self.Qi = build_Qi(joints)
+        # Joint properties
+        self.BB = build_BB(self.SS[1:, 1:])             # Body pairs connected
+        self.j_type = build_j_type(self.joints)
+        self.Qi = build_Qi(self.joints)
+
+    def info(self):
+        """
+        """
+        print()
+        print('MODEL')
+        print('Name = ', self.name)
+        print('Number of bodies = ', self.num_b)
+        print('Number of joints = ', self.num_j)
+        print('Body list = ', self.bodies)
+        print('Joint list = ', self.joints)
+        print()
+        print('CONNECTIVITY')
+        print('cc =')
+        print(self.cc)
+        print('SS =')
+        print(self.SS)
+        print()
+
+        return
 
     def set_param(self, Gravity=Gravity, Ez=Ez):
         """
