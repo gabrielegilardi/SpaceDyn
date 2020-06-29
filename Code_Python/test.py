@@ -27,7 +27,7 @@ name = 'foot/base'
 mass = 2.3
 inertia = 1.5 * np.eye(3)
 cc = {1: [0.05, 0.0, 0.0]}      # Leg connection
-foot = element.base(name=name, mass=mass, inertia=inertia, cc=cc)
+foot = element.link(name=name, mass=mass, inertia=inertia, cc=cc)
 
 # 1 - Leg
 name = 'leg'
@@ -36,8 +36,7 @@ inertia = 0.75 * np.eye(3)
 cc = {1: [-0.2, 0.0, 0.0],      # Foot/base connection
       2: [ 0.2, 0.0, 0.0],      # Trunk connection
       4: [ 0.2, 0.0, 0.0]}      # Lower arm connection
-Qe = [0.1, 0.2, 0.3]            # End-point relative orientation
-leg = element.link(name=name, mass=mass, inertia=inertia, cc=cc, Qe=Qe)
+leg = element.link(name=name, mass=mass, inertia=inertia, cc=cc)
 
 # 2 - Trunk
 name = 'trunk'
@@ -52,16 +51,14 @@ name = 'upper arm'
 mass = 0.7
 inertia = 2.0 * np.eye(3)
 cc = {3: [-0.2, 0.0, 0.0]}      # Trunk connection
-ce = [0.2, 0.0, 0.0]            # End-point position
-upperArm = element.link(name=name, mass=mass, inertia=inertia, cc=cc, ce=ce)
+upperArm = element.link(name=name, mass=mass, inertia=inertia, cc=cc)
 
 # 4 - Lower arm
 name = 'lower arm'
 mass = 0.8
 inertia = 4.0 * np.eye(3)
 cc = {4: [-0.2, 0.0, 0.0]}      # Leg connection
-ce = [0.2, 0.0, 0.0]            # End-point position
-lowerArm = element.link(name=name, mass=mass, inertia=inertia, cc=cc, ce=ce)
+lowerArm = element.link(name=name, mass=mass, inertia=inertia, cc=cc)
 
 # Joints numbering starts from one
 # ------
@@ -91,23 +88,33 @@ name = 'trunk - upper arm'
 j_type = 'R'
 j_trunk_upperArm = element.joint(name=name, j_type=j_type)
 
+
+# Model
+# ----
+
+name = 'humanoid robot'
+ee = {3: [0.3, 0.0, 0.0, -0.1, 0.0, 0.0],
+      4: [0.2, 0.0, 0.0, -0.2, 0.0, 0.0],
+      0: [0.0, 0.0, 0.0,  0.0, 0.0, 0.0]}
+bodies = [foot, leg, trunk, upperArm, lowerArm]
+joints = [j_foot_leg, j_leg_trunk, j_leg_lowerArm, j_trunk_upperArm]
+human_robot = model.model(name=name, bodies=bodies, joints=joints, ee=ee)
+
+human_robot.info()
+
 # Links and joints must be listed in order
-single_body = False
-if (single_body):
-    pass
+# single_body = False
+# if (single_body):
+#     pass
     # foot = element.base(2.3, 1.5*np.eye(3), name='foot')
     # robot = mc.model([foot])
     # robot.set_init(R0=[1.0, 2.0, 3.0], Q0=[0.1, 0.2, 0.3],
     #                    v0=[1.0, 2.0, 3.0], w0=[0.1, 0.2, 0.3])
 
-else:
-    name = 'humanoid robot'
-    bodies = [foot, leg, trunk, upperArm, lowerArm]
-    joints = [j_foot_leg, j_leg_trunk, j_leg_lowerArm, j_trunk_upperArm]
-    human_robot = model.model(name=name, bodies=bodies, joints=joints)
-    # robot.set_init(R0=[1.0, 2.0, 3.0], Q0=[0.1, 0.2, 0.3],
-    #                v0=[1.0, 2.0, 3.0], w0=[0.1, 0.2, 0.3],
-    #                q=[0.1, 0.5, 1.0, 1.5], qd=[ 0.01, 0.02, 0.03, 0.04 ])
+
+# robot.set_init(R0=[1.0, 2.0, 3.0], Q0=[0.1, 0.2, 0.3],
+#                v0=[1.0, 2.0, 3.0], w0=[0.1, 0.2, 0.3],
+#                q=[0.1, 0.5, 1.0, 1.5], qd=[ 0.01, 0.02, 0.03, 0.04 ])
 
 # robot.update_elements()
 # robot.set_param(Gravity=[-9.81, 0.0, 0.7], Ez=[0.0, 1.0, 1.0])

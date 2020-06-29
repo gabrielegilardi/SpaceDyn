@@ -38,30 +38,27 @@ def build_cc_SS(bodies):
     return cc, SS
 
 
-def build_ce_SE(bodies):
+def build_ce_Qe_SE(num_b, ee):
     """
-    Builds the matrices ce and SE (connectivity between bodies and end-points).
+    Builds the matrices ce, Qe, and SE (connectivity between bodies and
+    end-points).
 
-    ce[:, i]        Position vector from the centroid of the i-th link to its
-                    end-point
+    ce[:, i]        Position from the centroid of the i-th link to its end-point
+    Qe[:, i]        Orientation of the end-point on the i-th link
     SE[i]           +1 = the i-th body has and end-point
                      0 = the i-th body does not have and end-point
 
-    Notes:
-    - the base end-point is always in the centroid, thus it is always SE[0] = 1
-       and ce[:, 0] = 0.
-    - position vectors are given wrt the centroid frame.
+    Note: position and orientation are wrt the centroid frame.
     """
-    num_b = len(bodies)
     ce = np.zeros((3, num_b))
+    Qe = np.zeros((3, num_b))
     SE = np.zeros(num_b, dtype=int)
-    SE[0] = 1
-    for i in range(1, num_b):
-        v = bodies[i].ce
-        if (len(v) > 0):
-            ce[:, i] = np.asarray(v)
-            SE[i] = 1
-    return ce, SE
+    for i, v in ee.items():
+        ce[:, i] = np.asarray(v[0:3])           # Position
+        Qe[:, i] = np.asarray(v[3:6])           # Orientation
+        SE[i] = 1
+
+    return ce, Qe, SE
 
 
 def build_mass_inertia(bodies):
@@ -82,25 +79,16 @@ def build_mass_inertia(bodies):
     return mass, inertia
 
 
-def build_Qe(bodies):
-    """
-    Builds the end-point frame
-    
-    All end-point frame for the
-    base is always coincident with the centroid frame.
-    """
-    num_b = len(bodies)
-    Qe = np.zeros((3, num_b))        # Value for base is always zero
-    for i in range(1, num_b):
-        v = bodies[i].Qe
-        if (len(v) > 0):
-            Qe[:, i] = np.asarray(v)
-    return Qe
-
-
 def build_BB(SS):
     """
-    Builds vector BB (used for joints).
+    Builds vector BB.
+
+    BB[i]       Specify the previous link
+
+    Notes:
+    - SS is not the full matrix but the sub-matrix [1:num_b, 1:num_b].
+    - BB is associated with the joints, thus value BB[0] is for joint 1, value
+      BB[1] for joint 2, etc.
     """
     num_j = SS.shape[1]
     BB = np.zeros(num_j, dtype=int)
@@ -114,7 +102,7 @@ def build_BB(SS):
 
 def build_j_type(joints):
     """
-    Builds joint type (used for joints).
+    Builds the joint type (R or P) list.
     """
     num_j = len(joints)
     j_type = []
@@ -125,7 +113,7 @@ def build_j_type(joints):
 
 def build_Qi(joints):
     """
-    Builds joint frame (used for joints).
+    Builds the joint frames.
     """
     num_j = len(joints)
     Qi = np.zeros((3, num_j))
@@ -141,29 +129,31 @@ class model:
     Gravity = np.array([-9.81, 0.0, 0.0])               # Gravity
     Ez = np.array([0.0, 0.0, 1.0])                      # Joint z-axis
 
-    def __init__(self, name=None, bodies=[], joints=[]):
+    def __init__(self, name=None, bodies=[], joints=[], ee={}):
         """
         name        str         Name
         bodies      num_b       List of bodies
         joints      num_j       List of joints
+        ce          dict        Identifiers/positions of end-points [m]
+        Qe          dict        Identifiers/orientation of end-points [rad]
         """
         # Bodies = base + links, one joint for each link
         self.name = name
         self.bodies = bodies
         self.joints = joints
+        self.ee = ee
         self.num_j = len(self.joints)           # Number of joints (links)
         self.num_b = self.num_j + 1             # Number of bodies
 
         # Model connectivity
         self.cc, self.SS = build_cc_SS(self.bodies)     # Body to body/links
-        self.ce, self.SE = build_ce_SE(self.bodies)     # Body to end-point
+        self.ce, self.Qe, self.SE = build_ce_Qe_SE(self.num_b, self.ee)     # Body to end-point
 
         # Body properties
         self.mass, self.inertia = build_mass_inertia(self.bodies)
-        self.Qe = build_Qe(self.bodies)
 
         # Joint properties
-        self.BB = build_BB(self.SS[1:, 1:])             # Body pairs connected
+        self.BB = build_BB(self.SS[1:, 1:])             # Body-pairs connected
         self.j_type = build_j_type(self.joints)
         self.Qi = build_Qi(self.joints)
 
@@ -175,14 +165,14 @@ class model:
         print('Name = ', self.name)
         print('Number of bodies = ', self.num_b)
         print('Number of joints = ', self.num_j)
-        print('Body list = ', self.bodies)
-        print('Joint list = ', self.joints)
         print()
         print('CONNECTIVITY')
-        print('cc =')
-        print(self.cc)
         print('SS =')
         print(self.SS)
+        print('SE =')
+        print(self.SE)
+        print('BB =')
+        print(self.BB)
         print()
 
         return

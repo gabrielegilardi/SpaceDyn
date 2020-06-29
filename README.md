@@ -7,15 +7,20 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
 ## Implemented functions
 
 - File *elements.py*:
-  - __init__ for class Base
-  - __init__ for class Link
-  - __init__ for class Joint
+  - init (class Link)
+  - info (class Link)
+  - init (class Joint)
+  - info (class Joint)
 
 - File *model.py*:
-  - __init__ for class Model
+  - init (class Model)
+  - info (class Model)
   - build_cc_SS
-  - build_ce_SE
+  - build_ce_Qe_SE
   - build_mass_inertia
+  - build_BB
+  - build_j_type
+  - build_Qi
 
 - File *kinematics.py*:
 
