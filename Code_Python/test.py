@@ -7,6 +7,9 @@ Python version of:
     The SpaceDyn, a MATLAB toolbox for Space and Mobile Robots.
     (C)1998 The Space Robotics Lab. directed by Kazuya Yoshida,
     Tohoku University, Japan.
+
+- check arrays shape
+- add initial data checks and cross-checks    
 """
 
 import numpy as np
@@ -99,29 +102,13 @@ ee = {3: [0.3, 0.0, 0.0, -0.1, 0.0, 0.0],
 bodies = [foot, leg, trunk, upperArm, lowerArm]
 joints = [j_foot_leg, j_leg_trunk, j_leg_lowerArm, j_trunk_upperArm]
 human_robot = model.model(name=name, bodies=bodies, joints=joints, ee=ee)
-
 human_robot.info()
 
-# Links and joints must be listed in order
-# single_body = False
-# if (single_body):
-#     pass
-    # foot = element.base(2.3, 1.5*np.eye(3), name='foot')
-    # robot = mc.model([foot])
-    # robot.set_init(R0=[1.0, 2.0, 3.0], Q0=[0.1, 0.2, 0.3],
-    #                    v0=[1.0, 2.0, 3.0], w0=[0.1, 0.2, 0.3])
+R0 = np.array([1.0, 2.0, 3.0])
+Q0 = np.array([0.1, 0.2, 0.3])
+v0 = np.array([1.0, 2.0, 3.0])
+w0 = np.array([0.1, 0.2, 0.3])
+q = np.array([0.1, 0.5, 1.0, 1.5])
+qd = np.array([ 0.1, 0.2, 0.3, 0.4])
+human_robot.set_init(R0=R0, Q0=Q0, v0=v0, w0=w0, q=q, qd=qd)
 
-
-# robot.set_init(R0=[1.0, 2.0, 3.0], Q0=[0.1, 0.2, 0.3],
-#                v0=[1.0, 2.0, 3.0], w0=[0.1, 0.2, 0.3],
-#                q=[0.1, 0.5, 1.0, 1.5], qd=[ 0.01, 0.02, 0.03, 0.04 ])
-
-# robot.update_elements()
-# robot.set_param(Gravity=[-9.81, 0.0, 0.7], Ez=[0.0, 1.0, 1.0])
-
-# R0=np.array([[ 1.7,  1.7], [-2.0, -2.0 ], [3.4,  3.4 ]])
-# Q0=np.array([[-0.1, -0.1], [ 0.23, 0.23], [0.76, 0.76]])
-# print(R0, type(R0))
-# print(Q0, type(Q0))
-# dd = R0 - np.reshape(Q0[:, 0], (3, 1))
-# print(dd, dd.ndim)

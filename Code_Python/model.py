@@ -24,9 +24,9 @@ def build_cc_SS(bodies):
     SS[i, k]        +1 = the i-th body is connected to the k-th body
                     -1 = i-th body self-connection (always present)
                      0 = no connection between i-th and k-th bodies
-    
+
     Note: position vectors are given wrt the centroid frame.
-    """     
+    """
     num_b = len(bodies)
     cc = np.zeros((3, num_b, num_b))
     SS = np.zeros((num_b, num_b), dtype=int)
@@ -125,7 +125,7 @@ def build_Qi(joints):
 # Class model
 class model:
 
-    # Default values for some of the parameters
+    # Default values
     Gravity = np.array([-9.81, 0.0, 0.0])               # Gravity
     Ez = np.array([0.0, 0.0, 1.0])                      # Joint z-axis
 
@@ -145,9 +145,9 @@ class model:
         self.num_j = len(self.joints)           # Number of joints (links)
         self.num_b = self.num_j + 1             # Number of bodies
 
-        # Model connectivity
-        self.cc, self.SS = build_cc_SS(self.bodies)     # Body to body/links
-        self.ce, self.Qe, self.SE = build_ce_Qe_SE(self.num_b, self.ee)     # Body to end-point
+        # Model connectivity (Body to body and body to end-point)
+        self.cc, self.SS = build_cc_SS(self.bodies)
+        self.ce, self.Qe, self.SE = build_ce_Qe_SE(self.num_b, self.ee)
 
         # Body properties
         self.mass, self.inertia = build_mass_inertia(self.bodies)
@@ -179,18 +179,21 @@ class model:
 
     def set_param(self, Gravity=Gravity, Ez=Ez):
         """
-        Sets some the system parameters if different from default value.
+        Sets system parameters if different from default values.
         """
         self.Gravity = np.asarray(Gravity)
         self.Ez = np.asarray(Ez)
 
-    def set_init(self, R0=np.zeros(3), Q0=np.zeros(3), v0=np.zeros(3),
-                       w0=np.zeros(3), q=None, qd=None):
-        """
-        Initializes quantities at starting time. The zeros refer to the base,
-        not to the starting time. Unknown: R0, Q0 (A0), v0, w0, q, qd.
-        """
+        return
 
+    def set_init(self, R0=np.zeros(3), Q0=np.zeros(3), v0=np.zeros(3),
+                 w0=np.zeros(3), q=None, qd=None):
+        """
+        Initializes quantities at starting time. Unknown are R0, Q0 (A0), v0,
+        w0, q, qd.
+
+        Note: the zero refer to the base not to the time.
+        """
         # Base position, orientation, and velocities
         R0 = np.asarray(R0)
         Q0 = np.asarray(Q0)
@@ -207,69 +210,28 @@ class model:
         else:
             self.qd = np.zeros(self.num_j)
 
-        # Rotation matrices of all bodies (link centroid frame is equal to joint frame)
+        # Link rotation matrices (link and joint frame are parallel)
         self.AA = kin.calc_aa(Q0, self.q, self.BB, self.j_type, self.Qi)
 
-        # Position vector of all body centroids
-        self.RR = kin.calc_pos(R0, self.AA, self.q, self.BB, self.j_type, self.cc, self.Ez)
+        # Centroid positions
+        self.RR = kin.calc_pos(R0, self.AA, self.q, self.BB, self.j_type,
+                               self.cc, self.Ez)
 
-        # Linear velocity vector of all body centroids and angular velocity vector of
-        # all bodies
-        self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd, self.BB,
-            self.j_type, self.cc, self.Ez)
+        # Centroid velocities (linear and angular)
+        self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
+                                        self.BB, self.j_type, self.cc, self.Ez)
 
         # External forces
         self.Fe, self.Te, self.tau = dyn.calc_Forces(self.num_j)
 
-        P_ref = np.zeros(3)
-        self.LM = calc_Momentum(self.RR, self.AA, self.vv, self.ww, self.mass, self.inertia,
-            P_ref)
-
         # Forward dynamics
         # vd0, wd0, self.qdd = kin.f_dyn()
+        vd0 = np.array([1.0, 2.0, 3.0])
+        wd0 = np.array([0.1, 0.2, 0.3])
+        self.qdd = np.array([0.1, 0.5, 1.0, 1.5])
 
-        # Linear acceleration vector of all body centroids and angular acceleration vector
-        # of all bodies
-        # self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q, self.qd, \
-        #     self.qdd, self.BB, self.j_type, self.cc, self.Ez)
-
-        # # Check calc_acc
-        # vd0 = np.array([0.2, 0.2, 0.2])
-        # wd0 = np.array([0.3, 0.3, 0.3])
-        # qdd = np.array([-0.1, -0.2, -0.3, -0.4])
-        # qdd = np.array([])
-        # vd, wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q, self.qd, qdd, self.BB, \
-        #     self.j_type, self.cc, self.Ez)
-
-        # Check calc_je, calc_jte, calc_jre, f_kin_j, f_kin_e, j_num
-        # seq_link = kin.j_num(3, self.BB)
-        # Jacobian = kin.calc_je(self.RR, self.AA, self.q, seq_link, self.j_type, self.cc, \
-        #     self.ce, self.Qe, self.Ez)
-
-        # Check calc_jt, calc_jr, calc_hh
-        # HH = kin.calc_hh(self.RR, self.AA, self.mass, self.inertia, self.BB, \
-        #     self.j_type, self.cc, self.Ez)
-
-        # Check r_ne (with accelerations and external forces equal to zero)
-        # vd0 = np.zeros(3)
-        # wd0 = np.zeros(3)
-        # qdd = np.zeros(self.num_j)
-        # Fe, Te, tau = dyn.calc_Forces(self.num_j)
-        # Force = dyn.r_ne(self.RR, self.AA, v0, w0, vd0, wd0, self.q, self.qd, qdd, Fe, Te, \
-        #     self.SS, self.SE, self.j_type, self.cc, self.ce, self.mass, self.inertia, \
-        #         self.Ez, self.Gravity, self.BB)
-
-    def update_elements(self):
-        """
-        """
-        # Update body quantities
-        for i in range(self.num_b):
-            self.bodies[i].AA = self.AA[:, 3*i:3*(i+1)]
-            self.bodies[i].RR = self.RR[:, i]
-            self.bodies[i].vv = self.vv[:, i]
-            self.bodies[i].ww = self.ww[:, i]
-
-        # Update joint quantities
-        for i in range(self.num_j):
-            self.joints[i].q = self.q[i]
-            self.joints[i].qd = self.qd[i]
+        # Centroid accelerations (linear and angular)
+        self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
+                                        self.qd, self.qdd, self.BB, self.j_type,
+                                        self.cc, self.Ez)
+        return
