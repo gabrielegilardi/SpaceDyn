@@ -12,7 +12,7 @@ Python version of:
 import numpy as np
 
 import kinematics as kin
-from utils import cross
+from utils import cross, rotW
 
 
 def calc_Forces(num_j=0):
@@ -31,7 +31,7 @@ def calc_Forces(num_j=0):
 def r_ne(RR, AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te, SS, SE, j_type, cc, ce,
          mass, inertia, Ez, Gravity, BB):
     """
-    Inverse Dynamics computation by the Recursive Newton-Euler method.
+    Inverse Dynamics computation by the recursive Newton-Euler method.
     """
     num_j = len(q)              # Number of joints/links
     num_b = num_j + 1           # Number of bodies
@@ -137,3 +137,82 @@ def r_ne(RR, AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te, SS, SE, j_type, cc, ce,
     Force = np.block([FF0, TT0, tau])
 
     return Force
+
+
+def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce):
+    """
+    Forward dynamics using the Newmark-beta method and the Rodrigues formula
+    to update the rotations.
+    """
+    num_j = len(q)              # Number of joints/links
+    num_b = num_j + 1           # Number of bodies
+
+    # Newmark parameters
+    n_reps = 1
+    beta = 1.0/6.0
+    k1 = dt
+    k2 = dt * dt / 3.0
+    k3 = dt * dt * beta
+    k4 = dt / 2.0
+
+    # 1st step: prediction
+
+    # Get the acceleration terms for current state
+    vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te,
+                                      tau, SE, ce)
+
+    # Predict R0 and v0
+    Rdd0 = vd0_tmp
+    Rdd0_pred = Rdd0
+    R0_pred = R0 + k1 * v0 + k2 * Rdd0 + k3 * Rdd0_pred
+    Rd0_pred = v0 + k4 * (Rdd0 + Rdd0_pred)
+    v0_pred = Rd0_pred
+
+    # Predict q and qd
+    qdd = qdd_tmp
+    qdd_pred = qdd
+    q_pred = q + k1 * qd + k2 * qdd + k3 * qdd_pred
+    qd_pred = qd + k4 * (qdd + qdd_pred)
+
+    # Predict w0 and A0
+    wd0 = wd0_tmp
+    wd0_pred = wd0
+    w0_pred = w0 + k4 *(wd0 + wd0_pred)
+    A0_pred = rotW(w0_pred) @ A0
+
+    # 2nd step: correction
+    for i in range(n_reps):
+
+        # Get the acceleration terms for current state
+        vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0_pred, A0_pred, v0_pred, w0_pred,
+                                          q_pred, qd_pred, F0, T0, Fe, Te,
+                                          tau, SE, ce)
+
+        # Correct R0 and v0
+        Rdd0 = vd0_tmp
+        Rdd0_corr = Rdd0
+        R0_corr = R0 + k1 * v0 + k2 * Rdd0 + k3 * Rdd0_corr
+        Rd0_corr = v0 + k4 * (Rdd0 + Rdd0_corr)
+        v0_corr = Rd0_corr
+   
+        # Correct q and qd
+        qdd = qdd_tmp
+        qdd_corr = qdd
+        q_corr = q + k1 * qd + k2 * qdd + k3 * qdd_corr
+        qd_corr = qd + k4 * (qdd + qdd_corr)
+   
+        # Correct w0 and A0
+        wd0 = wd0_tmp
+        wd0_corr = wd0
+        w0_corr = w0 + k4 *(wd0 + wd0_corr)
+        A0_corr = rotW(w0_corr) @ A0
+   
+        # Next step
+        R0_pred = R0_corr
+        A0_pred = A0_corr
+        v0_pred = v0_corr
+        w0_pred = w0_corr
+        q_pred  = q_corr
+        qd_pred = qd_corr
+
+    return R0_pred, A0_pred, v0_pred, w0_pred, q_pred, qd_pred 

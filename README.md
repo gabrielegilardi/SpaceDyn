@@ -42,6 +42,7 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
 - File *dynamics.py*:
   - calc_Forces
   - r_ne
+  - f_dyn_nb2
 
 - File *utils.py*:
   - rotX
