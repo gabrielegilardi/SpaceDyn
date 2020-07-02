@@ -1,6 +1,6 @@
 # The Spacedyn - A toolbox for space and mobile robots
 
-This is a Python version of the [original Matlab code](http://www.astro.mech.tohoku.ac.jp/spacedyn/). Several new functions have also been added.
+This is a Python version of the [original Matlab code](http://www.astro.mech.tohoku.ac.jp/spacedyn/) from the Space Robotics Lab. (Prof. Kazuya Yoshida) at Tohoku University, Sendai, Japan. Several new functions have been added.
 
 !!! Work in progress !!!
 
@@ -57,3 +57,25 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - tr2diff
   - rotW
   - inertia_matrix
+
+- Functions done in Matlab but not ported in Python yet:
+  - f_dyn
+  - f_dyn_rk2
+  - i_dyn
+  - i_kine
+  - calc_gh
+  - calc_gj
+  - cacl_pos_CoM (new function)
+  - calc_vel_CoM (new function)
+  - calc_acc_CoM (new function)
+  - calc_Lin_Mom (new function)
+  - calc_Ang_Mom (new function)
+  - calc_der_Lin_Mom (new function)
+  - calc_der_Ang_Mom (new function)
+  - calc_Kin_Ene (new function)
+  - calc_Pot_Ene (new function)
+  - calc_Work (new function)
+  - inv_Kin_Func (new function)
+  - contact_model (new function)
+  - PSO (new function)
+  - Animation (new function)

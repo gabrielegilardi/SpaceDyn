@@ -8,7 +8,10 @@ Python version of:
     (C)1998 The Space Robotics Lab. directed by Kazuya Yoshida,
     Tohoku University, Japan.
 
-- check arrays shape
+- check equations used
+- check functions structure
+- decide how to organize data
+- check arrays for shape
 - add initial data checks and cross-checks    
 """
 
