@@ -13,6 +13,7 @@ Python version of:
 - decide how to organize data
 - check arrays for shape (also the ones already done)
 - add initial data checks and cross-checks    
+- optimize loops
 """
 
 import numpy as np
@@ -117,3 +118,11 @@ human_robot.set_init(R0=R0, Q0=Q0, v0=v0, w0=w0, q=q, qd=qd)
 
 TK, TKi = human_robot.calc_kin_ener()
 VG, VGi = human_robot.calc_pot_ener()
+print(VGi)
+
+LM, LMi = human_robot.calc_lin_mom()
+LM1, LM1i = human_robot.calc_lin_mom1()
+
+HM, HMi = human_robot.calc_ang_mom(np.array([1.0, 2.0, 3.0]))
+HM1, HM1i = human_robot.calc_ang_mom1(np.array([1.0, 2.0, 3.0]),
+                                      np.array([0.1, 0.2, 0.3]))

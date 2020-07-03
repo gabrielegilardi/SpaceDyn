@@ -13,6 +13,7 @@ import numpy as np
 
 import kinematics as kin
 import dynamics as dyn
+from utils import cross
 
 
 def build_cc_SS(bodies):
@@ -161,7 +162,6 @@ class model:
         self.Gravity = Gravity
         self.Ez = Ez
 
-
     def info(self):
         """
         """
@@ -181,7 +181,6 @@ class model:
         print()
 
         return
-
 
     def set_init(self, R0=np.zeros(3), Q0=np.zeros(3), v0=np.zeros(3),
                  w0=np.zeros(3), q=None, qd=None):
@@ -233,7 +232,6 @@ class model:
                                         self.cc, self.Ez)
         return
 
-
     def calc_CoM(self):
         """
         Returns position, velocity, and acceleration of the system center
@@ -241,13 +239,12 @@ class model:
         """
         m = diag(self.mass)
         m_tot = m.sum()
-        
-        RR_com  = (self.RR @ m).sum() / m_tot
-        vv_com  = (self.vv @ m).sum() / m_tot
-        vd_com  = (self.vd @ m).sum() / m_tot
+
+        RR_com = (self.RR @ m).sum() / m_tot
+        vv_com = (self.vv @ m).sum() / m_tot
+        vd_com = (self.vd @ m).sum() / m_tot
 
         return RR_com, vv_com, vd_com
-
 
     def calc_kin_ener(self):
         """
@@ -255,20 +252,64 @@ class model:
         """
         TK = np.zeros(self.num_b)
         for i in range(self.num_b):
-            An = self.AA[:, 3*i:3*(i+1)]
-            In = self.inertia[:, 3*i:3*(i+1)]
+            AA = self.AA[:, 3*i:3*(i+1)]
+            In = AA @ self.inertia[:, 3*i:3*(i+1)] @ AA.T
             TK[i] = self.mass[i] * (self.vv[:, i].T @ self.vv[:, i]) / 2.0 \
-                    + self.ww[:, i].T @ An @ In @ An.T @ self.ww[:, i] / 2.0
+                    + self.ww[:, i].T @ In @ self.ww[:, i] / 2.0
 
         return TK.sum(), TK
-
 
     def calc_pot_ener(self):
         """
         Returns the potential energy for the entire system and for each body.
         """
-        VG = np.zeros(self.num_b)
-        for i in range(self.num_b):
-            VG[i] = - self.mass[i] * (self.Gravity.T @ self.RR[:, i])
+        VG = - self.mass * (self.Gravity.T @ self.RR)
 
         return VG.sum(), VG
+
+    def calc_lin_mom(self):
+        """
+        Returns the linear momentum for the entire system and for each body.
+        """
+        LM = self.mass * self.vv
+
+        return LM.sum(axis=1), LM
+
+    def calc_lin_mom1(self):
+        """
+        Returns the derivative of the linear momentum for the entire system and
+        for each body.
+        """
+        LM1 = self.mass * self.vd
+
+        return LM1.sum(axis=1), LM1
+
+    def calc_ang_mom(self, P_ref=np.zeros(3)):
+        """
+        Returns the angular momentum for the entire system and for each body
+        with respect to point P_ref.
+        """
+        HM = np.zeros((3, self.num_b))
+        for i in range(self.num_b):
+            AA = self.AA[:, 3*i:3*(i+1)]
+            In = AA @ self.inertia[:, 3*i:3*(i+1)] @ AA.T
+            HM[:, i] = cross(self.RR[:, i] - P_ref,
+                       self.mass[i] * self.vv[:, i] + In @ self.ww[:, i])
+
+        return HM.sum(axis=1), HM
+
+    def calc_ang_mom1(self, P_ref=np.zeros(3), V_ref=np.zeros(3)):
+        """
+        Returns the derivativeangular momentum for the entire system and for
+        each body with respect to point P_ref and velocity V_ref.
+        """
+        HM = np.zeros((3, self.num_b))
+        for i in range(self.num_b):
+            AA = self.AA[:, 3*i:3*(i+1)]
+            In = AA @ self.inertia[:, 3*i:3*(i+1)] @ AA.T
+            HM[:, i] = In @ self.wd[:, i] \
+                       + cross(self.ww[:, i], In @ self.ww[:, i]) \
+                       + cross(self.RR[:, i] - P_ref, self.mass[i] * self.vd[:, i]) \
+                       + cross(self.vv[:, i] - V_ref, self.mass[i] * self.vv[:, i])
+
+        return HM.sum(axis=1), HM
