@@ -118,7 +118,6 @@ human_robot.set_init(R0=R0, Q0=Q0, v0=v0, w0=w0, q=q, qd=qd)
 
 TK, TKi = human_robot.calc_kin_ener()
 VG, VGi = human_robot.calc_pot_ener()
-print(VGi)
 
 LM, LMi = human_robot.calc_lin_mom()
 LM1, LM1i = human_robot.calc_lin_mom1()

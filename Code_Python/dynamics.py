@@ -215,6 +215,71 @@ def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce):
     return R0_pred, A0_pred, v0_pred, w0_pred, q_pred, qd_pred 
 
 
+def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce):
+    """
+    Forward dynamics using the Runge-Kutta method and the Rodrigues formula
+    to update the rotations.
+    """
+    # 1st step
+    vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te,
+                                      tau, SE, ce)
+
+    k1_R0 = v0 * dt
+    k1_A0 = rotW(w0) @ A0 - A0
+    k1_q  = qd * dt
+    k1_v0 = vd0_tmp * dt
+    k1_w0 = wd0_tmp * dt
+    k1_qd = qdd_tmp * dt
+
+    # 2nd Step
+    vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0 + k1_R0 / 2.0, A0 + k1_A0 / 2.0,
+                                      v0 + k1_v0 / 2.0, w0 + k1_w0 / 2.0,
+                                      q + k1_q / 2.0, qd + k1_qd / 2.0,
+                                      F0, T0, Fe, Te, tau, SE, ce)
+
+    k2_R0 = (v0 + k1_v0 / 2.0) * dt
+    k2_A0 = rotW(w0 + k1_w0 / 2.0) @ A0 - A0
+    k2_q  = (qd + k1_qd / 2.0) * dt
+    k2_v0 = vd0_tmp * dt
+    k2_w0 = wd0_tmp * dt
+    k2_qd = qdd_tmp * dt
+
+    # 3rd Step
+    vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0 + k2_R0 / 2.0, A0 + k2_A0 / 2.0,
+                                      v0 + k2_v0 / 2.0, w0 + k2_w0 / 2.0,
+                                      q + k2_q / 2.0, qd + k2_qd / 2.0,
+                                      F0, T0, Fe, Te, tau, SE, ce)
+
+    k3_R0 = (v0 + k2_v0 / 2.0) * dt
+    k3_A0 = rotW(w0 + k2_w0 / 2.0) @ A0 - A0
+    k3_q  = (qd + k2_qd / 2.0) * dt
+    k3_v0 = vd0_tmp * dt
+    k3_w0 = wd0_tmp * dt
+    k3_qd = qdd_tmp * dt
+
+    # 4th Step
+    vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0 + k3_R0, A0 + k3_A0, v0 + k3_v0,
+                                      w0 + k3_w0, q + k3_q, qd + k3_qd,
+                                      F0, T0, Fe, Te, tau, SE, ce)
+
+    k4_R0 = (v0 + k3_v0) * dt
+    k4_A0 = rotW(w0 + k3_w0) @ A0 - A0
+    k4_q  = (qd + k3_qd) * dt
+    k4_v0 = vd0_tmp * dt
+    k4_w0 = wd0_tmp * dt
+    k4_qd = qdd_tmp * dt
+
+    # Compute Values at the Next Time Step
+    R0_pred = R0 + (k1_R0 + 2.0 * k2_R0 + 2.0 * k3_R0 + k4_R0) / 6.0
+    A0_pred = A0 + (k1_A0 + 2.0 * k2_A0 + 2.0 * k3_A0 + k4_A0) / 6.0
+    q_pred  = q  + (k1_q  + 2.0 * k2_q  + 2.0 * k3_q  + k4_q) / 6.0
+    v0_pred = v0 + (k1_v0 + 2.0 * k2_v0 + 2.0 * k3_v0 + k4_v0) / 6.0
+    w0_pred = w0 + (k1_w0 + 2.0 * k2_w0 + 2.0 * k3_w0 + k4_w0) / 6.0
+    qd_pred = qd + (k1_qd + 2.0 * k2_qd + 2.0 * k3_qd + k4_qd) / 6.0
+
+    return R0_pred, A0_pred, v0_pred, w0_pred, q_pred, qd_pred 
+
+
 def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce):
     """
     Forward dynamics: returns the accelerations given the state and any
