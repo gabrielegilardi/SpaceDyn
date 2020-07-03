@@ -26,6 +26,10 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - calc_CoM (new function - position, velocity, and acceleration of the CoM)
   - calc_kin_ener (new function - kinetic energy for system/links)
   - calc_pot_ener (new function - potential energy for system/links)
+  - calc_lin_mom (new function - linear momentum for system/links)
+  - calc_lin_mom1 (new function - system linear momentum 1st derivative)
+  - calc_ang_mom (new function - angular momentum for system/links)
+  - calc_ang_mom1 (new function- system angular momentum 1st derivative)
 
 - File *kinematics.py*:
   - j_num (link sequence to an end-point)
@@ -68,10 +72,6 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - i_kine (inverse kinematics)
   - calc_gh (generalized inertia matrix)
   - calc_gj (generalized Jacobian)
-  - calc_Lin_Mom (new function - linear momentum for system/links)
-  - calc_Ang_Mom (new function - angular momentum for system/links)
-  - calc_der_Lin_Mom (new function - system linear momentum 1st derivative)
-  - calc_der_Ang_Mom (new function- system angular momentum 1st derivative)
   - calc_Work (new function - work for system/links)
   - inv_Kin_Func (new function - inverse kinematics for system CoM)
   - Contact_Forces (new function - contact forces)
