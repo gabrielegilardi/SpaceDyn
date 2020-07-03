@@ -235,3 +235,16 @@ class model:
                                         self.qd, self.qdd, self.BB, self.j_type,
                                         self.cc, self.Ez)
         return
+
+
+    def calc_CoM(mass, RR, vv, vd):
+        """
+        Return position, velocity, and acceleration of the system center
+        of mass.
+        """
+
+        RR_com  = (RR @ diag(m)).sum() / mass.sum()
+        vv_com  = (vv @ diag(m)).sum() / mass.sum()
+        vd_com  = (vd @ diag(m)).sum() / mass.sum()
+
+        return RR_com, vv_com, vd_com

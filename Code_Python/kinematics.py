@@ -385,7 +385,7 @@ def calc_jr(AA, BB, j_type, Ez):
 
 def calc_hh(RR, AA, mass, inertia, BB, j_type, cc, Ez):
     """
-    Returns the inertia matrices HH (6 + num_j) x (6 + num_j).
+    Returns the inertia matrix HH (6 + num_j) x (6 + num_j).
     """
     num_j = len(j_type)         # Number of joints/links
     num_b = num_j + 1           # Number of bodies
