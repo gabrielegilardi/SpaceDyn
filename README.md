@@ -1,4 +1,4 @@
-# SpaceDyn - A toolbox for space, mobile, and humanoid robotic systems
+# SpaceDyn - A toolbox for Space, Mobile, and Humanoid Robotic Systems
 
 This is a Python version of the [original Matlab code](http://www.astro.mech.tohoku.ac.jp/spacedyn/) from the Space Robotics Lab. at Tohoku University (Sendai, Japan). New functions useful for control and for humanoid robots have also been added.
 
@@ -21,7 +21,6 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - build_Qi (joint frames)
   - init (new function - class Model)
   - info (new function - class Model)
-  - set_param (new function - initialize system param)
   - set_init (new function - initialize system)
   - calc_CoM (new function - position, velocity, and acceleration of the CoM)
   - calc_kin_ener (new function - kinetic energy for system/links)
@@ -50,6 +49,7 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - calc_Forces (user-defined external forces)
   - r_ne (inverse dynamics by recursive Newton-Euler method)
   - f_dyn_nb2 (integration using Newmark-beta method)
+  - f_dyn_rk2 (integration using Runge-Kutta)
 
 - File *utils.py*:
   - rotX (rotation about X axis)
@@ -67,7 +67,6 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
 
 - Functions done in Matlab but not ported in Python yet:
   - f_dyn (forward dynamics)
-  - f_dyn_rk2 (integration using Runge-Kutta)
   - i_dyn (inverse dynamics)
   - i_kine (inverse kinematics)
   - calc_gh (generalized inertia matrix)
