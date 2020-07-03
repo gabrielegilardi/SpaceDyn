@@ -203,7 +203,7 @@ def rotW(w0, dt):
 
 def inertia_matrix(shape, *args):
     """
-    Returns the moments of inertia wrt the centroid for simple shapes.
+    Returns the moments of inertia wrt the centroid for basic shapes.
     """
     inertia = np.zeros((3, 3))
 

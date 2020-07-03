@@ -250,7 +250,7 @@ def calc_vel(AA, v0, w0, q, qd, BB, j_type, cc, Ez):
 
         # Rotational joint
         if (j_type[idxi] == 'R'):
-            ww[:, i] = ww[:, k] + A_I_i @ (Ez * qd[idxi])
+            ww[:, i] = ww[:, k] + qd[idxi] * (A_I_i @ Ez)
             vv[:, i] = vv[:, k] + cross(ww[:, k], (A_I_k @ cc[:, k, i])) \
                                 - cross(ww[:, i], (A_I_i @ cc[:, i, i]))
 

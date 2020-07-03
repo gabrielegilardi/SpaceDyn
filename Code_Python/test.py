@@ -11,7 +11,7 @@ Python version of:
 - check equations used
 - check functions structure
 - decide how to organize data
-- check arrays for shape
+- check arrays for shape (also the ones already done)
 - add initial data checks and cross-checks    
 """
 
@@ -115,3 +115,5 @@ q = np.array([0.1, 0.5, 1.0, 1.5])
 qd = np.array([ 0.1, 0.2, 0.3, 0.4])
 human_robot.set_init(R0=R0, Q0=Q0, v0=v0, w0=w0, q=q, qd=qd)
 
+TK, TKi = human_robot.calc_kin_ener()
+VG, VGi = human_robot.calc_pot_ener()

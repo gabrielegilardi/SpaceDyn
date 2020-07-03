@@ -125,11 +125,11 @@ def build_Qi(joints):
 # Class model
 class model:
 
-    # Default values
-    Gravity = np.array([-9.81, 0.0, 0.0])               # Gravity
-    Ez = np.array([0.0, 0.0, 1.0])                      # Joint z-axis
+    Gravity = np.array([-9.81, 0.0, 0.0])
+    Ez = np.array([0.0, 0.0, 1.0])
 
-    def __init__(self, name=None, bodies=[], joints=[], ee={}):
+    def __init__(self, name=None, bodies=[], joints=[], ee={}, Gravity=Gravity,
+                 Ez=Ez):
         """
         name        str         Name
         bodies      num_b       List of bodies
@@ -157,6 +157,11 @@ class model:
         self.j_type = build_j_type(self.joints)
         self.Qi = build_Qi(self.joints)
 
+        # Default values for gravity and joint z-axis
+        self.Gravity = Gravity
+        self.Ez = Ez
+
+
     def info(self):
         """
         """
@@ -177,14 +182,6 @@ class model:
 
         return
 
-    def set_param(self, Gravity=Gravity, Ez=Ez):
-        """
-        Sets system parameters if different from default values.
-        """
-        self.Gravity = np.asarray(Gravity)
-        self.Ez = np.asarray(Ez)
-
-        return
 
     def set_init(self, R0=np.zeros(3), Q0=np.zeros(3), v0=np.zeros(3),
                  w0=np.zeros(3), q=None, qd=None):
@@ -237,14 +234,41 @@ class model:
         return
 
 
-    def calc_CoM(mass, RR, vv, vd):
+    def calc_CoM(self):
         """
-        Return position, velocity, and acceleration of the system center
-        of mass.
+        Returns position, velocity, and acceleration of the system center
+        of mass (CoM).
         """
-
-        RR_com  = (RR @ diag(m)).sum() / mass.sum()
-        vv_com  = (vv @ diag(m)).sum() / mass.sum()
-        vd_com  = (vd @ diag(m)).sum() / mass.sum()
+        m = diag(self.mass)
+        m_tot = m.sum()
+        
+        RR_com  = (self.RR @ m).sum() / m_tot
+        vv_com  = (self.vv @ m).sum() / m_tot
+        vd_com  = (self.vd @ m).sum() / m_tot
 
         return RR_com, vv_com, vd_com
+
+
+    def calc_kin_ener(self):
+        """
+        Returns the kinetic energy for the entire system and for each body.
+        """
+        TK = np.zeros(self.num_b)
+        for i in range(self.num_b):
+            An = self.AA[:, 3*i:3*(i+1)]
+            In = self.inertia[:, 3*i:3*(i+1)]
+            TK[i] = self.mass[i] * (self.vv[:, i].T @ self.vv[:, i]) / 2.0 \
+                    + self.ww[:, i].T @ An @ In @ An.T @ self.ww[:, i] / 2.0
+
+        return TK.sum(), TK
+
+
+    def calc_pot_ener(self):
+        """
+        Returns the potential energy for the entire system and for each body.
+        """
+        VG = np.zeros(self.num_b)
+        for i in range(self.num_b):
+            VG[i] = - self.mass[i] * (self.Gravity.T @ self.RR[:, i])
+
+        return VG.sum(), VG
