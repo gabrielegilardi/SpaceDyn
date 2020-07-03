@@ -24,6 +24,8 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - set_param (new function - initialize system param)
   - set_init (new function - initialize system)
   - calc_CoM (new function - position, velocity, and acceleration of the CoM)
+  - calc_kin_ener (new function - kinetic energy for system/links)
+  - calc_pot_ener (new function - potential energy for system/links)
 
 - File *kinematics.py*:
   - j_num (link sequence to an end-point)
@@ -46,18 +48,18 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - f_dyn_nb2 (integration using Newmark-beta method)
 
 - File *utils.py*:
-  - rotX
-  - rotY
-  - rotZ
-  - tilde
-  - rpy2dc
-  - dc2rpy
-  - eul2dc
-  - dc2eul
-  - cross
-  - tr2diff
-  - rotW
-  - inertia_matrix
+  - rotX (rotation about X axis)
+  - rotY (rotation about Y axis)
+  - rotZ (rotation about Z axis)
+  - tilde (skew-symmetric forn of a vector)
+  - rpy2dc (RPY angles to rotation matrix)
+  - dc2rpy (rotation matrix to RPY angles)
+  - eul2dc (Euler angles to rotation matrix)
+  - dc2eul (rotation matrix to Euler angles)
+  - cross (single/multi-vector cross product)
+  - tr2diff (difference between rotation matrices)
+  - rotW (rotation vector to rotation matrix)
+  - inertia_matrix (moments of inertia for basic shapes)
 
 - Functions done in Matlab but not ported in Python yet:
   - f_dyn (forward dynamics)
@@ -66,13 +68,11 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - i_kine (inverse kinematics)
   - calc_gh (generalized inertia matrix)
   - calc_gj (generalized Jacobian)
-  - calc_Lin_Mom (new function - system linear momentum)
-  - calc_Ang_Mom (new function - system angular momentum)
+  - calc_Lin_Mom (new function - linear momentum for system/links)
+  - calc_Ang_Mom (new function - angular momentum for system/links)
   - calc_der_Lin_Mom (new function - system linear momentum 1st derivative)
   - calc_der_Ang_Mom (new function- system angular momentum 1st derivative)
-  - calc_Kin_Ene (new function- system kinetic energy)
-  - calc_Pot_Ene (new function - system potential energy)
-  - calc_Work (new function - system work)
+  - calc_Work (new function - work for system/links)
   - inv_Kin_Func (new function - inverse kinematics for system CoM)
   - Contact_Forces (new function - contact forces)
   - PSO (new function - particle swarm optimizer)
