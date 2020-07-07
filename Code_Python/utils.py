@@ -1,5 +1,5 @@
 """
-SpaceDyn - A Toolbox for Space and Mobile Robots.
+SpaceDyn - A Toolbox for Space, Mobile, and Humanoid Robots.
 
 Copyright (c) 2020 Gabriele Gilardi
 

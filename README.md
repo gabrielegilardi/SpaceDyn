@@ -77,3 +77,4 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - PSO (new function - particle swarm optimizer)
   - Animation (new function - animate system)
   - SaveResults (new function - save results)
+  - Joint_Limits (new function - allows to impose limits on the joints)
