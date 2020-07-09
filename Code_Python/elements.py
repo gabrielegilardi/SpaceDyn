@@ -16,50 +16,89 @@ import dynamics as dyn
 from utils import cross
 
 
-def build_cc_SS(bodies):
+def connectivity(bodies, ee):
     """
-    Builds the matrices cc and SS (connectivity between bodies/joints).
+    Builds the connectivity matrices.
 
-    cc[:, i, k]     Position vector from the centroid of the i-th link to the
-                    k-th joint (own joint when k = i)
     SS[i, k]        +1 = the i-th body is connected to the k-th body
-                    -1 = i-th body self-connection (always present)
-                     0 = no connection between i-th and k-th bodies
+                    -1 = i-th body own-connection (always present)
+                     0 = no connection between i-th and k-th body
+    SE[i]           +1 = the i-th body has and end-point
+                     0 = the i-th body does not have and end-point
+    BB[i]           Previous body
 
-    Note: position vectors are given wrt the centroid frame.
+    Note: no own joint or previous body for the base.
     """
     num_b = len(bodies)
-    cc = np.zeros((3, num_b, num_b))
+    num_ee = len(ee)
+
+    # Base-to-link and link-to-link connections
     SS = np.zeros((num_b, num_b), dtype=int)
     for i in range(num_b):
         for k, v in bodies[i].cc.items():
-            cc[:, i, k] = np.asarray(v)
             SS[i, k] = 1
-        SS[i, i] = -1
-    return cc, SS
+        SS[i, i] = -1               # Value for the base never used
+
+    # Base-to-endpoint and link-to-endpoint connections
+    SE = np.zeros(num_ee, dtype=int)
+    for i, v in ee.items():
+        SE[i] = v[0]
+
+    # Previous body connection (BB[0] for body 1, BB[1] for body 2, etc.)
+    BB = np.zeros(num_b-1, dtype=int)
+    for col in range(1, num_b):
+        for row in range(1, col):
+            if (np.abs(SS[row, col]) == 1):
+                BB[col-1] = row
+                break
+
+    return SS, SE, BB
 
 
-def build_ce_Qe_SE(num_b, ee):
+def build_cc_Qi(bodies):
     """
-    Builds the matrices ce, Qe, and SE (connectivity between bodies and
-    end-points).
+    Builds the matrix defining the links/joints positions and orientations.
 
-    ce[:, i]        Position from the centroid of the i-th link to its end-point
-    Qe[:, i]        Orientation of the end-point on the i-th link
-    SE[i]           +1 = the i-th body has and end-point
-                     0 = the i-th body does not have and end-point
+    cc[:, i, k]     Position from the centroid of the i-th body to the joint
+                    on the k-th body (own joint when k = i)
+
+    Notes:
+    - positions and orientations are given wrt the centroid frame.
+    - the base does not have a relative orientation.
+    """
+    num_b = len(bodies)
+
+    # Relative positions (base + links)
+    cc = np.zeros((3, num_b, num_b))
+    for i in range(num_b):
+        for k, v in bodies[i].cc.items():
+            cc[:, i, k] = np.asarray(v)
+
+    # Relative orientations (links only)
+    Qi = np.zeros((3, num_b-1))
+    for i in range(1, num_b):
+        Qi[:, i-1] = bodies[i].Qi
+
+    return cc, Qi
+
+
+def build_ce_Qe(ee):
+    """
+    Builds the matrices defining the endpoint positions and orientations.
+
+    ce[:, i]        Position from the centroid of the i-th body to its endpoint
+    Qe[:, i]        Orientation of the end-point on the i-th body
 
     Note: position and orientation are wrt the centroid frame.
     """
-    ce = np.zeros((3, num_b))
-    Qe = np.zeros((3, num_b))
-    SE = np.zeros(num_b, dtype=int)
+    num_ee = len(ee)
+    ce = np.zeros((3, num_ee))
+    Qe = np.zeros((3, num_ee))
     for i, v in ee.items():
-        ce[:, i] = np.asarray(v[0:3])           # Position
-        Qe[:, i] = np.asarray(v[3:6])           # Orientation
-        SE[i] = 1
+        ce[:, i] = np.asarray(v[1])           # Position
+        Qe[:, i] = np.asarray(v[2])           # Orientation
 
-    return ce, Qe, SE
+    return ce, Qe
 
 
 def build_mass_inertia(bodies):
@@ -80,27 +119,6 @@ def build_mass_inertia(bodies):
     return mass, inertia
 
 
-def build_BB(SS):
-    """
-    Builds vector BB.
-
-    BB[i]       Specify the previous link
-
-    Notes:
-    - SS is not the full matrix but the sub-matrix [1:num_b, 1:num_b].
-    - BB is associated with the joints, thus value BB[0] is for joint 1, value
-      BB[1] for joint 2, etc.
-    """
-    num_j = SS.shape[1]
-    BB = np.zeros(num_j, dtype=int)
-    for col in range(num_j):
-        for row in range(col):
-            if (np.abs(SS[row, col]) == 1):
-                BB[col] = row + 1
-                break
-    return BB
-
-
 def build_j_type(joints):
     """
     Builds the joint type (R or P) list.
@@ -110,17 +128,6 @@ def build_j_type(joints):
     for i in range(num_j):
         j_type.append(joints[i].j_type)
     return j_type
-
-
-def build_Qi(joints):
-    """
-    Builds the joint frames.
-    """
-    num_j = len(joints)
-    Qi = np.zeros((3, num_j))
-    for i in range(num_j):
-        Qi[:, i] = joints[i].Qi
-    return Qi
 
 
 class base:
@@ -219,21 +226,22 @@ class model:
         self.Gravity = np.asarray(Gravity)
         self.Ez = np.asarray(Ez)
 
-        self.joints = bodies[1:]                # List of joints
+        self.joints = self.bodies[1:]           # List of joints
         self.num_j = len(self.joints)           # Number of joints
         self.num_b = self.num_j + 1             # Number of bodies
+        self.num_ee = len(self.ee)
 
-        # Model connectivity (Body to body and body to end-point)
-        self.cc, self.SS = build_cc_SS(self.bodies)
-        self.ce, self.Qe, self.SE = build_ce_Qe_SE(self.num_b, self.ee)
+        # Connectivity
+        self.SS, self.SE, self.BB = connectivity(self.bodies, self.ee)
 
-        # Body properties
+        # Links and endpoints relative positions/orientations
+        self.cc, self_Qi = build_cc_Qi(self.bodies)
+        self.ce, self.Qe = build_ce_Qe(self.ee)
+
+        # Properties
         self.mass, self.inertia = build_mass_inertia(self.bodies)
-
-        # Joint properties
-        self.BB = build_BB(self.SS[1:, 1:])             # Body-pairs connected
         self.j_type = build_j_type(self.joints)
-        self.Qi = build_Qi(self.joints)
+
 
     def info(self):
         """

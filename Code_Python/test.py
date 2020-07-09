@@ -73,9 +73,12 @@ lowerArm = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
                         cc=cc)
 
 name = 'simple robot'
-ee = {3: [0.13, 0.0, 0.0, 0.0, 90.0 / d2r, 90.0 / d2r],
-      4: [0.17, 0.0, 0.0, -90.0 / d2r, 90.0 / d2r, 0.0],
-      0: [0.4, -0.05, 0.0, 0.0, 0.0, -90.0 / d2r]}
+ee = {
+      0: (0, [0.4, -0.05, 0.0], [0.0, 0.0, -90.0 / d2r]),
+      2: (3, [0.13, 0.0, 0.0],  [0.0, 90.0 / d2r, 90.0 / d2r]),
+      1: (3, [0.15, 0.0, 0.0],  [0.0, -90.0 / d2r, 90.0 / d2r]),
+      3: (4, [0.17, 0.0, 0.0],  [-90.0 / d2r, 90.0 / d2r, 0.0])
+     }
 bodies = [foot, leg, trunk, upperArm, lowerArm]
 robot = element.model(name=name, bodies=bodies, ee=ee)
 

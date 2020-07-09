@@ -7,20 +7,16 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
 ## Implemented functions
 
 - File *elements.py*:
+  - init (new function - class Base)
+  - info (new function - class Base)
   - init (new function - class Link)
   - info (new function - class Link)
-  - init (new function - class Joint)
-  - info (new function - class Joint)
-
-- File *model.py*:
-  - build_cc_SS (connectivity between bodies/joints)
-  - build_ce_Qe_SE (connectivity between bodies/end-points)
-  - build_mass_inertia (system mass and inertia)
-  - build_BB (branch link sequence)
-  - build_j_type (joint type)
-  - build_Qi (joint frames)
   - init (new function - class Model)
   - info (new function - class Model)
+  - connectivity (connectivity between bodies and endpoints)
+  - build_cc_Qi (position/orientation links)
+  - build_ce_Qe (position/orientation end-points)
+  - build_mass_inertia (system mass and inertia)
   - set_init (new function - initialize system)
   - calc_CoM (new function - position, velocity, and acceleration of the CoM)
   - calc_kin_ener (new function - kinetic energy for system/links)
