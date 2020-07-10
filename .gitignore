@@ -148,8 +148,9 @@ static
 # Matlab directory
 Code_Matlab/
 
-# Docs directory
+# Docs directory and docs
 Docs/
+*.docx
 
 # Data directory
 data/
