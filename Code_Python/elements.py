@@ -30,7 +30,7 @@ def connectivity(bodies, ee):
     Note: no own joint or previous body for the base.
     """
     num_b = len(bodies)
-    num_ee = len(ee)
+    num_e = len(ee)
 
     # Base-to-link and link-to-link connections
     SS = np.zeros((num_b, num_b), dtype=int)
@@ -40,7 +40,7 @@ def connectivity(bodies, ee):
         SS[i, i] = -1               # Value for the base never used
 
     # Base-to-endpoint and link-to-endpoint connections
-    SE = np.zeros(num_ee, dtype=int)
+    SE = np.zeros(num_e, dtype=int)
     for i, v in ee.items():
         SE[i] = v[0]
 
@@ -91,9 +91,9 @@ def build_ce_Qe(ee):
 
     Note: position and orientation are wrt the centroid frame.
     """
-    num_ee = len(ee)
-    ce = np.zeros((3, num_ee))
-    Qe = np.zeros((3, num_ee))
+    num_e = len(ee)
+    ce = np.zeros((3, num_e))
+    Qe = np.zeros((3, num_e))
     for i, v in ee.items():
         ce[:, i] = np.asarray(v[1])           # Position
         Qe[:, i] = np.asarray(v[2])           # Orientation
@@ -229,7 +229,7 @@ class model:
         self.joints = self.bodies[1:]           # List of joints
         self.num_j = len(self.joints)           # Number of joints
         self.num_b = self.num_j + 1             # Number of bodies
-        self.num_ee = len(self.ee)
+        self.num_e = len(self.ee)
 
         # Connectivity
         self.SS, self.SE, self.BB = connectivity(self.bodies, self.ee)

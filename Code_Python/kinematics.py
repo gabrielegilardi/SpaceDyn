@@ -164,7 +164,7 @@ def calc_je(RR, AA, q, seq_link, j_type, cc, ce, Qe, Ez):
 
 def calc_aa(Q0, q, BB, j_type, Qi):
     """
-    Returns the rotation matrices of all bodies (centroid and joint frame are
+    Returns the rotation matrices of all bodies (centroid and joint frames are
     always parallel).
     """
     num_j = len(q)                  # Number of joints/links
@@ -178,9 +178,10 @@ def calc_aa(Q0, q, BB, j_type, Qi):
     for i in range(1, num_b):
 
         idxi = i - 1             # Index link/joint <i> in BB, j_type, Qi
-        k = BB[idxi]             # Connected previous link/joint
+        k = BB[idxi]                    # Previous link/joint
+        A_I_k = AA[:, 3*k:3*(k+1)]      # Rotation matrix previous link
 
-        # Rotational joint
+        # Rotational joint (is this correct if Ez not z axis?????)
         if (j_type[idxi] == 'R'):
             A_rel = rpy2dc(Qi[0, idxi], Qi[1, idxi], Qi[2, idxi] + q[idxi]).T
 
@@ -188,15 +189,15 @@ def calc_aa(Q0, q, BB, j_type, Qi):
         elif (j_type[idxi] == 'P'):
             A_rel = rpy2dc(Qi[:, idxi]).T
 
-        # Update rotation matrix
-        AA[:, 3*i:3*(i+1)] = AA[:, 3*k:3*(k+1)] @ A_rel
+        # Update rotation matrix (integral of eqs. 3.8 and 3.12)
+        AA[:, 3*i:3*(i+1)] = A_I_k @ A_rel      # A_I_i
 
     return AA
 
 
 def calc_pos(R0, AA, q, BB, j_type, cc, Ez):
     """
-    Returns the position of all body centroids.
+    Returns the position of all body centroids (figure 3.5)
     """
     num_j = len(q)              # Number of joints/links
     num_b = num_j + 1           # Number of bodies
@@ -215,11 +216,11 @@ def calc_pos(R0, AA, q, BB, j_type, cc, Ez):
         A_I_i = AA[:, 3*i:3*(i+1)]
         A_I_k = AA[:, 3*k:3*(k+1)]
 
-        # Rotational joint
+        # Rotational joint (integral of eq. 3.9)
         if (j_type[idxi] == 'R'):
             RR[:, i] = RR[:, k] + A_I_k @ cc[:, k, i] - A_I_i @ cc[:, i, i]
 
-        # Prismatic joint
+        # Prismatic joint (integral of eq. 3.13)
         elif (j_type[idxi] == 'P'):
             RR[:, i] = RR[:, k] + A_I_k @ cc[:, k, i] \
                                 - A_I_i @ (Ez * q[idxi] - cc[:, i, i])
@@ -431,28 +432,30 @@ def calc_hh(RR, AA, mass, inertia, BB, j_type, cc, Ez):
 
         # Rotation and inertia matrix
         A_I_i = AA[:, 3*i:3*(i+1)]
-        In = inertia[:, 3*i:3*(i+1)]
-        In_I_i = A_I_i @ In @ A_I_i.T
+        In_I_i = A_I_i @ inertia[:, 3*i:3*(i+1)] @ A_I_i.T
 
         # Eq. 3.21 - shape (3 x 3)
-        HH_w = HH_w + (In_I_i + mass[i] * tilde(r0i).T @ tilde(r0i))
+        HH_w += In_I_i + mass[i] * tilde(r0i).T @ tilde(r0i)
 
         # Eq. 3.22 - shape (3 x num_j)
-        HH_wq = HH_wq + In_I_i @ JJ_r[:, id1:id2] \
-                      + mass[i] * tilde(r0i) @ JJ_t[:, id1:id2]
+        HH_wq += In_I_i @ JJ_r[:, id1:id2] \
+                 + mass[i] * tilde(r0i) @ JJ_t[:, id1:id2]
 
         # Eq. 3.23 - shape (num_j x num_j)
-        HH_q = HH_q + JJ_r[:, id1:id2].T @ In_I_i.T @ JJ_r[:, id1:id2] \
-                    + mass[i] * JJ_t[:, id1:id2].T @ JJ_t[:, id1:id2]
+        HH_q += JJ_r[:, id1:id2].T @ In_I_i.T @ JJ_r[:, id1:id2] \
+                + mass[i] * JJ_t[:, id1:id2].T @ JJ_t[:, id1:id2]
 
         # Eq. 3.24 - shape (3 x num_j)
-        JJ_tg = JJ_tg + mass[i] * JJ_t[:, id1:id2]      #!!!!!! divided by total mass???
+        JJ_tg += mass[i] * JJ_t[:, id1:id2]      #!!!!!! divided by total mass???
 
     # Matrix HH_b (eq. 3.19) - shape (6 x 6)
     wE = mass.sum() * np.eye(3)
+
     Rg = mass * RR[:, 0:num_b] / mass.sum()
     wr0g = mass * (Rg - RR[:, 0])
+
     HH_w += AA[:, 0:3] @ inertia[:, 0:3] @ AA[:, 0:3].T
+
     HH_b = np.block([[wE,          tilde(wr0g).T],
                      [tilde(wr0g), HH_w         ]])
 

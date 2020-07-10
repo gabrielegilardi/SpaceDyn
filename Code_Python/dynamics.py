@@ -31,112 +31,244 @@ def calc_Forces(num_j=0):
 def r_ne(RR, AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te, SS, SE, j_type, cc, ce,
          mass, inertia, Ez, Gravity, BB):
     """
-    Inverse Dynamics computation by the recursive Newton-Euler method.
+    Inverse dynamics computation by the recursive Newton-Euler method
+    (eqs. 3.30-3.39).
+
+    FF, TT          Inertial forces and moments on the centroids
+    Fj, Tj          Forces and moments on the joints
+    Fe, Te          Forces and moments on the endpoints
+
+    F0, T0          Reaction force and moment of the base
+    tau             Torques/forces on the revolute/prismatic joints
+
+    !!!! check signs !!!!!
+
     """
     num_j = len(q)              # Number of joints/links
     num_b = num_j + 1           # Number of bodies
+    num_e = len(SE)             # Number of endpoints
 
-    # Base and links velocities
+    # Linear and angular velocities (all bodies)
     vv, ww = kin.calc_vel(AA, v0, w0, q, qd, BB, j_type, cc, Ez)
 
-    # Base and links accelerations
+    # Linear and angular accelerations (all bodies)
     vd, wd = kin.calc_acc(AA, ww, vd0, wd0, q, qd, qdd, BB, j_type, cc, Ez)
 
-    # Inertial forces and moments on the base and link centroids (includes
-    # also the gravity effects)
+    # Inertial forces and moments on the centroids, including the gravitational
+    # force (eqs. 3.30-3.31) - base is included
     FF = np.zeros((3, num_b))
     TT = np.zeros((3, num_b))
-    for i in range(0, num_b):
+    for i in range(num_b):
 
         A_I_i = AA[:, 3*i:3*(i+1)]
-        In_I = A_I_i @ inertia[:, 3*i:3*(i+1)] @ A_I_i.T
+        In_I_i = A_I_i @ inertia[:, 3*i:3*(i+1)] @ A_I_i.T
 
         # Eq. 3.30 and 3.31
         FF[:, i] = mass[i] * (vd[:, i] - Gravity)
-        TT[:, i] = In_I @ wd[:, i] + cross(ww[:, i], (In_I @ ww[:, i]))
+        TT[:, i] = In_I_i @ wd[:, i] + cross(ww[:, i], (In_I_i @ ww[:, i]))
 
-    # Forces and moments on joints (Eqs. 3.32 and 3.33)
-    Fjnt = np.zeros((3, num_j))
-    Tjnt = np.zeros((3, num_j))
+    # Forces and moments on the joints (eqs. 3.32-3.35)
+    Fj = np.zeros((3, num_j))
+    Tj = np.zeros((3, num_j))
 
-    # Loop over the joints from the last
+    # Start from the last link
     for i in range(num_j, 0, -1):
 
-        idxi = i - 1            # Index link/joint <i> in Fjnt, Tjnt, j_type, q
-        F_tmp = np.zeros(3)
-        T_tmp = np.zeros(3)
-
-        # Forces - Eq. 3.32 (each link may have more than one upper connection)
-        for j in range(i+1, num_j+1):
-            idxj = j - 1        # Index link/joint <j> in Fjnt
-            F_tmp = F_tmp + float(SS[i, j]) * Fjnt[:, idxj]
-        Fjnt[:, idxi] = FF[:, i] + F_tmp + float(SE[i]) * Fe[:, i]
-
-        # Moments (Eq. 3.33)
-
-        # Add attached links contribution (each link may have more than one
-        # upper connection)
+        idxi = i - 1            # Index joint <i> in Fjnt, Tjnt, j_type, q
         A_I_i = AA[:, 3*i:3*(i+1)]
+        is_P = float(j_type[idxi] == 'P')       # Joint <i> is prismatic
+
+        # Vector centroid <i> to joint <i>
+        L_ii = cc[:, i, i] - is_P * Ez * q[idxi]
+
+        # Add inertial force and moment (!!!! why moment is negative !!!!)
+        Fj[:, idxi] = FF[:, i]
+        Tj[:, idxi] = TT[:, i] - cross((A_I_i @ L_ii), FF[:, i])
+
+        # Add connected links force and moments (may be more than one)
         for j in range(i+1, num_j+1):
-            idxj = j - 1        # Index link/joint <j> in j_type, q, Fjnt, Tjnt
-            d = cc[:, i, j] - cc[:, i, i] + \
-                float(j_type[idxj] == 'P') * Ez * q[idxj]
-            T_tmp = T_tmp + float(SS[i, j]) * (cross((A_I_i @ d), Fjnt[:, idxj])
-                                               + Tjnt[:, idxj])
+            
+            idxj = j - 1        # Index joint <j> in j_type, q, Fjnt, Tjnt
 
-        # Add inertial terms contribution (rotational joint)
-        if (j_type[idxi] == 'R'):
-            Tjnt[:, idxi] = TT[:, i] + T_tmp \
-                                     - cross((A_I_i @ cc[:, i, i]), FF[:, i])
+            # Add contribution if link <j> is connected to link <i>
+            if (SS[i, j]):
 
-        # Add inertial terms contribution (prismatic joint)
-        elif (j_type[idxi] == 'P'):
-            Tjnt[:, idxi] = TT[:, i] + T_tmp \
-                - cross((A_I_i @ (Ez * q[idxi] - cc[:, i, i])), FF[:, i])
+                # Vector joint <i> to joint <j>
+                L_ij = cc[:, i, j] - cc[:, i, i] + is_P * Ez * q[idxj]
 
-        # Add endpoint contribution
-        d = ce[:, i] - cc[:, i, i] + float(j_type[idxi] == 'P') * Ez * q[idxi]
-        Tjnt[:, idxi] = Tjnt[:, idxi] - float(SE[i]) \
-                        * (cross((A_I_i @ d), Fe[:, i]) + Te[:, i])
+                # Add joint force and moment
+                Fj[:, idxi] += Fj[:, idxj]
+                Tj[:, idxi] += cross(A_I_i @ L_ij, Fj[:, idxj]) + Tj[:, idxj]
+        
+        # Add external forces and moments
+        for ie in range(num_e):
 
-    # Reaction forces on the base (Eqs. 3.38 and 3.39)
-    F_tmp = np.zeros(3)
-    T_tmp = np.zeros(3)
+            # Add contribution if endpoint <ie> is connected to link <i>
+            if (SE[ie] == i):
 
-    # Forces/moments from the links connected to the base
+                # Vector centroid <i> to endpoint <ie>
+                L_ie = ce[:, ie] - cc[:, i, i] + is_P * Ez * q[idxi]
+
+                # Add external force and moment (!!!!! check sign both !!!!)
+                Fj[:, idxi] += - Fe[:, ie]
+                Tj[:, idxi] += - cross(A_I_i @ L_ie, Fe[:, ie]) - Te[:, ie]
+
+    # Reaction force and moment on the base centroid (Eqs. 3.38 and 3.39)
+    FF0 = np.zeros(3)
+    TT0 = np.zeros(3)
+
+    # Add inertial force and moment of the base
+    FF0 += FF[:, 0]
+    TT0 += TT[:, 0]
+    
+    # Add forces and moments from the links connected to the base
     for i in range(1, num_j+1):
 
-        idxi = i - 1             # Index link/joint <i> in Fjnt, Tjnt
-
-        # Add if the link is connected (Eq. 3.38 and 3.39)
+        # Add if link <i> is connected
         if (SS[0, i] > 0):
-            F_tmp = F_tmp + float(SS[0, i]) * Fjnt[:, idxi]
-            T_tmp = T_tmp + float(SS[0, i]) \
-                    * cross((AA[:, 0:3] @ cc[:, 0, i]), Fjnt[:, idxi]) + \
-                    Tjnt[:, idxi]
+            idxi = i - 1             # Index link/joint <i> in Fjnt, Tjnt
+            FF0 += Fj[:, idxi]
+            TT0 += cross(AA[:, 0:3] @ cc[:, 0, i], Fj[:, idxi]) + Tj[:, idxi]
 
-    # Add inertial and external terms
-    FF0 = FF[:, 0] + F_tmp + float(SE[i]) * Fe[:, 0]
-    TT0 = TT[:, 0] + T_tmp + float(SE[i]) * Te[:, 0]
+    # Add external forces and moments !!! check signs !!!!!
+    for ie in range(num_e):
 
-    # Calculation of torque at each joint (Eq. 3.36 and 3.37)
+        # Add contribution if endpoint <ie> is connected to the base
+        if (SE[ie] == 0):
+            FF0 += - Fe[:, ie]
+            TT0 += - cross(AA[:, 0:3] @ ce[:, ie], Fe[:, ie]) - Te[:, ie]
+
+    # Calculation of joint torques/forces (eq. 3.36 and 3.37)
     tau = np.zeros(num_j)
     for i in range(1, num_j+1):
 
         idxi = i - 1        # Index link/joint <i> in Fjnt, Tjnt, j_type, tau
         Ez_I_i = AA[:, 3*i:3*(i+1)] @ Ez
 
+        # If revolute joint (eq. 3.36)
         if (j_type[idxi] == 'R'):
-            tau[idxi] = Tjnt[:, idxi] @ Ez_I_i      # Eq. 3.36
+            tau[idxi] = Tj[:, idxi] @ Ez_I_i
 
-        # Prismatic joint
+        # If prismatic joint (eq. 3.37)
         elif (j_type[idxi] == 'P'):
-            tau[idxi] = Fjnt[:, idxi] @ Ez_I_i       # Eq. 3.37
+            tau[idxi] = Fj[:, idxi] @ Ez_I_i
 
     # Compose generalized forces (return [FF0, TT0] if single-body)
     Force = np.block([FF0, TT0, tau])
 
     return Force
+
+
+def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce):
+    """
+    Forward dynamics: returns the accelerations given the state and any
+    external input.
+
+    !!!! Correct ee calculations based on new SE format - calc_je !!!!
+    """
+    num_j = len(q)              # Number of joints/links
+    num_b = num_j + 1           # Number of bodies
+
+    # Rotation matrices
+    AA = calc_aa(A0, q)
+
+    # Position vectors
+    RR = calc_pos(R0, A0, AA, q)
+
+    # Inertia matrice
+    HH = calc_hh(R0, RR, A0, AA)
+
+    # # Calculation of velocty dependent term, accomplished by recursive Newton
+    # # Eulero inverse dynamics with accelerations and external forces set to 0.
+    # qdd0 = np.zeros((num_j, 1))
+    # acc0 = np.zeros((3, 1))
+    # fe0  = np.zeros((3, num_j))
+    # Force0 = r_ne(R0, RR, A0, AA, v0, w0, acc0, acc0, q, qd, qdd0, fe0, fe0 )
+
+    # # % Force = forces on the generalized coordinate.
+    # # % Force_ex = forces on the end points.
+    # Force = zeros(6+num_q,1);
+    # Force_ex = zeros(6+num_q,1);
+
+# % F0, T0 are forces on the centroid of the 0-th body.
+# Force(1:3) = F0;
+# Force(4:6) = T0;
+
+# % If Multi body system, tau is a joint torque.
+# if ( num_q ~= 0 )
+#    Force(7:num_q+6) = tau;
+# end
+
+# % Calculate external forces
+
+# % If single body system, no external forces.
+# if num_q == 0
+#    % Note that the body 0 cannot have an endpoint.
+#    Fx   = zeros(3,1);
+#    Tx   = zeros(3,1);
+#    taux = [];
+   
+# % Multi body system
+# else
+#    Fx    = zeros(3,1);
+#    Tx    = zeros(3,1);
+#    taux  = zeros(num_q,1);
+   
+#    E_3 = eye(3,3);
+#    O_3 = zeros(3,3);
+#    num_e = 1;
+   
+#    for i = 1 : num_q
+      
+#       if SE(i)==1
+#          joints = j_num(num_e);
+#          tmp = calc_je(RR, AA, q, joints);        !!!! new format for SE
+#          JJ_tx_i = tmp(1:3,:);
+#          JJ_rx_i = tmp(4:6,:);
+         
+#          num_e = num_e + 1;
+         
+#          A_I_i = AA(:,i*3-2:i*3);
+#          Re0i = RR(:,i) - R0 + A_I_i*ce(:,i);
+         
+#          Me_i = [         E_3      O_3;
+#                   tilde(Re0i)      E_3;
+#                      JJ_tx_i'  JJ_rx_i' ];
+#          F_ex(:,i) = Me_i * [ Fe(:,i) ; Te(:,i) ];
+         
+#       end
+      
+#    end
+   
+#    for i = 1 : num_q
+      
+#       Fx   = Fx   + F_ex(1:3,i);
+#       Tx   = Tx   + F_ex(4:6,i);
+#       taux = taux + F_ex(7:6+num_q,i);
+      
+#    end
+   
+# end
+
+# Force_ex(1:3) = Fx;
+# Force_ex(4:6) = Tx;
+# Force_ex(7:6+num_q) = taux;
+
+# % Calculation of the acclelation
+# a_Force = Force - Force0 + Force_ex;
+
+# Acc = HH\a_Force;
+# %Acc = inv(HH)*a_Force;
+
+# vd0 = Acc(1:3);
+# wd0 = Acc(4:6);
+# qdd = Acc(7:6+num_q);
+
+# if num_q == 0
+#    qdd=[];
+# end
+
+    return vd0, wd0, qdd
 
 
 def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce):
@@ -280,111 +412,3 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce):
     return R0_pred, A0_pred, v0_pred, w0_pred, q_pred, qd_pred 
 
 
-def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce):
-    """
-    Forward dynamics: returns the accelerations given the state and any
-    external input.
-    """
-    num_j = len(q)              # Number of joints/links
-    num_b = num_j + 1           # Number of bodies
-
-    # Rotation matrices
-    AA = calc_aa(A0, q)
-
-    # Position vectors
-    RR = calc_pos(R0, A0, AA, q)
-
-    # Inertia matrice
-    HH = calc_hh(R0, RR, A0, AA)
-
-    # # Calculation of velocty dependent term, accomplished by recursive Newton
-    # # Eulero inverse dynamics with accelerations and external forces set to 0.
-    # qdd0 = np.zeros((num_j, 1))
-    # acc0 = np.zeros((3, 1))
-    # fe0  = np.zeros((3, num_j))
-    # Force0 = r_ne(R0, RR, A0, AA, v0, w0, acc0, acc0, q, qd, qdd0, fe0, fe0 )
-
-    # # % Force = forces on the generalized coordinate.
-    # # % Force_ex = forces on the end points.
-    # Force = zeros(6+num_q,1);
-    # Force_ex = zeros(6+num_q,1);
-
-# % F0, T0 are forces on the centroid of the 0-th body.
-# Force(1:3) = F0;
-# Force(4:6) = T0;
-
-# % If Multi body system, tau is a joint torque.
-# if ( num_q ~= 0 )
-#    Force(7:num_q+6) = tau;
-# end
-
-# % Calculate external forces
-
-# % If single body system, no external forces.
-# if num_q == 0
-#    % Note that the body 0 cannot have an endpoint.
-#    Fx   = zeros(3,1);
-#    Tx   = zeros(3,1);
-#    taux = [];
-   
-# % Multi body system
-# else
-#    Fx    = zeros(3,1);
-#    Tx    = zeros(3,1);
-#    taux  = zeros(num_q,1);
-   
-#    E_3 = eye(3,3);
-#    O_3 = zeros(3,3);
-#    num_e = 1;
-   
-#    for i = 1 : num_q
-      
-#       if SE(i)==1
-#          joints = j_num(num_e);
-#          tmp = calc_je(RR, AA, q, joints);
-#          JJ_tx_i = tmp(1:3,:);
-#          JJ_rx_i = tmp(4:6,:);
-         
-#          num_e = num_e + 1;
-         
-#          A_I_i = AA(:,i*3-2:i*3);
-#          Re0i = RR(:,i) - R0 + A_I_i*ce(:,i);
-         
-#          Me_i = [         E_3      O_3;
-#                   tilde(Re0i)      E_3;
-#                      JJ_tx_i'  JJ_rx_i' ];
-#          F_ex(:,i) = Me_i * [ Fe(:,i) ; Te(:,i) ];
-         
-#       end
-      
-#    end
-   
-#    for i = 1 : num_q
-      
-#       Fx   = Fx   + F_ex(1:3,i);
-#       Tx   = Tx   + F_ex(4:6,i);
-#       taux = taux + F_ex(7:6+num_q,i);
-      
-#    end
-   
-# end
-
-# Force_ex(1:3) = Fx;
-# Force_ex(4:6) = Tx;
-# Force_ex(7:6+num_q) = taux;
-
-# % Calculation of the acclelation
-# a_Force = Force - Force0 + Force_ex;
-
-# Acc = HH\a_Force;
-# %Acc = inv(HH)*a_Force;
-
-# vd0 = Acc(1:3);
-# wd0 = Acc(4:6);
-# qdd = Acc(7:6+num_q);
-
-# if num_q == 0
-#    qdd=[];
-# end
-
-    return vd0, wd0, qdd
