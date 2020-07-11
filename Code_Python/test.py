@@ -12,6 +12,7 @@ Python version of:
 import numpy as np
 
 import elements as element
+import kinematics as kin
 
 
 d2r = 180.0 / np.pi
@@ -82,7 +83,7 @@ ee = {
 bodies = [foot, leg, trunk, upperArm, lowerArm]
 robot = element.model(name=name, bodies=bodies, ee=ee)
 
-robot.info()
+# robot.info()
 
 # Initial conditions
 # R0 = np.array([1.0, 2.0, 3.0])

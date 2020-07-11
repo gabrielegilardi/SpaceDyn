@@ -16,14 +16,13 @@ from utils import rpy2dc, cross, tilde
 
 def j_num(num_link, BB):
     """
-    Returns the link sequence from the base (excluded) to the endpoint
-    associated with link <num_link>.
+    Returns the link sequence from the base (excluded) to the link <num_link>.
     """
-    seq_link = [num_link]               # Add current link
+    seq_link = []
+    j_number = num_link
 
     # Walk back until the base (j_number = 0) is reached
-    j_number = BB[num_link-1]
-    while (j_number != 0):
+    while (j_number > 0):
         seq_link.insert(0, j_number)
         j_number = BB[j_number-1]
 
@@ -32,7 +31,7 @@ def j_num(num_link, BB):
 
 def f_kin_e(RR, AA, seq_link, Qe, ce):
     """
-    Returns position and orientation of the endpoint defined by sequence
+    Returns position and orientation of the endpoint associated with sequence
      <seq_link>.
      """
     # Link number
@@ -42,10 +41,10 @@ def f_kin_e(RR, AA, seq_link, Qe, ce):
     A_I_i = AA[:, 3*i:3*(i+1)]
 
     # Orientation
-    ORI_e = A_I_i @ rpy2dc(Qe[:, i]).T
+    ORI_e = A_I_i @ rpy2dc(Qe).T
 
     # Position
-    POS_e = RR[:, i] + A_I_i @ ce[:, i]
+    POS_e = RR[:, i] + A_I_i @ ce
 
     return POS_e, ORI_e
 
@@ -81,8 +80,8 @@ def f_kin_j(RR, AA, q, seq_link, j_type, cc, Ez):
 
 def calc_jte(RR, AA, q, seq_link, j_type, cc, ce, Qe, Ez):
     """
-    Returns the translational Jacobian (3 x n_links) of the end-point defined
-    by sequence <seq_link> (equation 3.25).
+    Returns the translational Jacobian (3 x n_links) of the endpoint associated
+    with sequence <seq_link> (equation 3.25).
     """
     n_links = len(seq_link)
     JJ_te = np.zeros((3, n_links))
@@ -112,8 +111,8 @@ def calc_jte(RR, AA, q, seq_link, j_type, cc, ce, Qe, Ez):
 
 def calc_jre(AA, seq_link, j_type, Ez):
     """
-    Returns the rotational Jacobian (3 x n_links) of the end-point defined
-    by sequence <seq_link> (equation 3.26).
+    Returns the rotational Jacobian (3 x n_links) of the endpoint associated
+    with sequence <seq_link> (equation 3.26).
     """
     n_links = len(seq_link)
     JJ_re = np.zeros((3, n_links))
@@ -135,9 +134,9 @@ def calc_jre(AA, seq_link, j_type, Ez):
     return JJ_re
 
 
-def calc_je(RR, AA, q, seq_link, j_type, cc, ce, Qe, Ez):
+def calc_je(RR, AA, q, seq_link, j_type, cc, ce, Qe, Ez, ie):
     """
-    Returns the Jacobian (6 x num_j) of the endpoint defined by sequence
+    Returns the Jacobian (6 x num_j) of the endpoint associated with sequence
     <seq_link> (equations 3.25 and 3.26).
     """
     n_links = len(seq_link)
