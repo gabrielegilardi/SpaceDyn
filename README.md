@@ -46,6 +46,7 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - r_ne (inverse dynamics by recursive Newton-Euler method)
   - f_dyn_nb2 (integration using Newmark-beta method)
   - f_dyn_rk2 (integration using Runge-Kutta)
+  - f_dyn (forward dynamics)
 
 - File *utils.py*:
   - rotX (rotation about X axis)
@@ -62,7 +63,6 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - inertia_matrix (moments of inertia for basic shapes)
 
 - Functions done in Matlab but not ported in Python yet:
-  - f_dyn (forward dynamics)
   - i_dyn (inverse dynamics)
   - i_kine (inverse kinematics)
   - calc_gh (generalized inertia matrix)
