@@ -159,8 +159,8 @@ def r_ne(RR, AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te, SS, SE, j_type, cc, ce,
     return Force
 
 
-def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce, Q0, BB,
-          j_type, Qi, cc, Ez, mass, inertia, Qe):
+def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce, BB,
+          j_type, Qi, cc, Ez, mass, inertia, Qe, SS):
     """
     Forward dynamics computation: returns the accelerations given the state
     (positions/orientations and velocities) and any external input.
@@ -170,7 +170,7 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce, Q0, BB,
     num_e = len(SE)
 
     # Rotation matrices
-    AA = calc_aa(Q0, q, BB, j_type, Qi)
+    AA = calc_aa(A0, q, BB, j_type, Qi)
 
     # Position vectors
     RR = calc_pos(R0, AA, q, BB, j_type, cc, Ez)
@@ -250,8 +250,8 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce, Q0, BB,
     return vd0, wd0, qdd
 
 
-def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, Q0, BB,
-              j_type, Qi, cc, Ez, mass, inertia, Qe):
+def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
+              j_type, Qi, cc, Ez, mass, inertia, Qe, SS):
     """
     Integration of the equations of motion using the Newmark-beta method and
     the Rodrigues formula to update the rotations.
@@ -268,8 +268,8 @@ def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, Q0, BB,
 
     # Get the acceleration terms for current state
     vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te,
-                                      tau, SE, ce, Q0, BB, j_type, Qi, cc, Ez,
-                                      mass, inertia, Qe)
+                                      tau, SE, ce, BB, j_type, Qi, cc, Ez,
+                                      mass, inertia, Qe, SS)
 
     # Predict R0 and v0
     Rdd0 = vd0_tmp
@@ -296,8 +296,8 @@ def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, Q0, BB,
         # Get the acceleration terms for current state
         vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0_pred, A0_pred, v0_pred, w0_pred,
                                           q_pred, qd_pred, F0, T0, Fe, Te,
-                                          tau, SE, ce, Q0, BB, j_type, Qi, cc,
-                                          Ez, mass, inertia, Qe)
+                                          tau, SE, ce, BB, j_type, Qi, cc,
+                                          Ez, mass, inertia, Qe, SS)
 
         # Correct R0 and v0
         Rdd0 = vd0_tmp
@@ -329,16 +329,16 @@ def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, Q0, BB,
     return R0_pred, A0_pred, v0_pred, w0_pred, q_pred, qd_pred 
 
 
-def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, Q0, BB,
-              j_type, Qi, cc, Ez, mass, inertia, Qe):
+def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
+              j_type, Qi, cc, Ez, mass, inertia, Qe, SS):
     """
     Integration of the equations of motion using the Runge-Kutta method and
     the Rodrigues formula to update the rotations.
     """
     # 1st step
     vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te,
-                                      tau, SE, ce, Q0, BB, j_type, Qi, cc, Ez,
-                                      mass, inertia, Qe)
+                                      tau, SE, ce, BB, j_type, Qi, cc, Ez,
+                                      mass, inertia, Qe, SS)
 
     k1_R0 = v0 * dt
     k1_A0 = rotW(w0) @ A0 - A0
@@ -351,8 +351,8 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, Q0, BB,
     vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0 + k1_R0 / 2.0, A0 + k1_A0 / 2.0,
                                       v0 + k1_v0 / 2.0, w0 + k1_w0 / 2.0,
                                       q + k1_q / 2.0, qd + k1_qd / 2.0,
-                                      F0, T0, Fe, Te, tau, SE, ce, Q0, BB,
-                                      j_type, Qi, cc, Ez, mass, inertia, Qe)
+                                      F0, T0, Fe, Te, tau, SE, ce, BB,
+                                      j_type, Qi, cc, Ez, mass, inertia, Qe, SS)
 
     k2_R0 = (v0 + k1_v0 / 2.0) * dt
     k2_A0 = rotW(w0 + k1_w0 / 2.0) @ A0 - A0
@@ -365,8 +365,8 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, Q0, BB,
     vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0 + k2_R0 / 2.0, A0 + k2_A0 / 2.0,
                                       v0 + k2_v0 / 2.0, w0 + k2_w0 / 2.0,
                                       q + k2_q / 2.0, qd + k2_qd / 2.0,
-                                      F0, T0, Fe, Te, tau, SE, ce, Q0, BB,
-                                      j_type, Qi, cc, Ez, mass, inertia, Qe)
+                                      F0, T0, Fe, Te, tau, SE, ce, BB,
+                                      j_type, Qi, cc, Ez, mass, inertia, Qe, SS)
 
     k3_R0 = (v0 + k2_v0 / 2.0) * dt
     k3_A0 = rotW(w0 + k2_w0 / 2.0) @ A0 - A0
@@ -378,8 +378,8 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, Q0, BB,
     # 4th Step
     vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0 + k3_R0, A0 + k3_A0, v0 + k3_v0,
                                       w0 + k3_w0, q + k3_q, qd + k3_qd,
-                                      F0, T0, Fe, Te, tau, SE, ce, Q0, BB,
-                                      j_type, Qi, cc, Ez, mass, inertia, Qe)
+                                      F0, T0, Fe, Te, tau, SE, ce, BB,
+                                      j_type, Qi, cc, Ez, mass, inertia, Qe, SS)
 
     k4_R0 = (v0 + k3_v0) * dt
     k4_A0 = rotW(w0 + k3_w0) @ A0 - A0

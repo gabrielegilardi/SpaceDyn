@@ -13,7 +13,7 @@ import numpy as np
 
 import kinematics as kin
 import dynamics as dyn
-from utils import cross
+from utils import cross, rpy2dc
 
 
 def connectivity(bodies, ee):
@@ -209,10 +209,9 @@ class link:
 
 class model:
 
-    Gravity = np.array([-9.81, 0.0, 0.0])
-    Ez = np.array([0.0, 0.0, 1.0])
-
-    def __init__(self, name=None, bodies=[], ee={}, Gravity=Gravity, Ez=Ez):
+    def __init__(self, name=None, bodies=[], ee={},
+                 Gravity=np.array([-9.81, 0.0, 0.0]),
+                 Ez=np.array([0.0, 0.0, 1.0])):
         """
         name        str         Name
         bodies      num_b       List of bodies
@@ -264,54 +263,54 @@ class model:
         return
 
     def set_init(self, R0=np.zeros(3), Q0=np.zeros(3), v0=np.zeros(3),
-                 w0=np.zeros(3), q=None, qd=None):
+                 w0=np.zeros(3), q=np.array([]), qd=np.array([])):
         """
-        Initializes quantities at starting time. Unknown are R0, Q0 (A0), v0,
-        w0, q, qd.
+        Initializes quantities at starting time.
 
         Note: the zero refer to the base not to the time.
         """
-        # Base position, orientation, and velocities
+        # Base (position, orientation, and velocities)
         R0 = np.asarray(R0)
         Q0 = np.asarray(Q0)
+        A0 = rpy2dc(Q0).T
         v0 = np.asarray(v0)
         w0 = np.asarray(w0)
 
-        # Joints rotations/displacements and velocities
-        if (q is not None):
+        # Joints (rotations/displacements and velocities)
+        if (len(q) >0):
             self.q = q
         else:
             self.q = np.zeros(self.num_j)
-        if (qd is not None):
+        if (len(qd)):
             self.qd = qd
         else:
             self.qd = np.zeros(self.num_j)
 
-        # Link rotation matrices (link and joint frame are parallel)
-        self.AA = kin.calc_aa(Q0, self.q, self.BB, self.j_type, self.Qi)
+        # # Link rotation matrices (link and joint frame are parallel)
+        # self.AA = kin.calc_aa(A0, self.q, self.BB, self.j_type, self.Qi)
 
-        # Centroid positions
-        self.RR = kin.calc_pos(R0, self.AA, self.q, self.BB, self.j_type,
-                               self.cc, self.Ez)
+        # # Centroid positions
+        # self.RR = kin.calc_pos(R0, self.AA, self.q, self.BB, self.j_type,
+        #                        self.cc, self.Ez)
 
-        # Centroid velocities (linear and angular)
-        self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
-                                        self.BB, self.j_type, self.cc, self.Ez)
+        # # Centroid velocities (linear and angular)
+        # self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
+        #                                 self.BB, self.j_type, self.cc, self.Ez)
 
-        # External forces
-        self.Fe, self.Te, self.tau = dyn.calc_Forces(self.num_j)
+        # # External forces
+        # self.Fe, self.Te, self.tau = dyn.calc_Forces(self.num_j)
 
-        # Forward dynamics
-        # vd0, wd0, self.qdd = kin.f_dyn()
-        vd0 = np.array([1.0, 2.0, 3.0])
-        wd0 = np.array([0.1, 0.2, 0.3])
-        self.qdd = np.array([0.1, 0.5, 1.0, 1.5])
+        # # Forward dynamics
+        # # vd0, wd0, self.qdd = kin.f_dyn()
+        # vd0 = np.array([1.0, 2.0, 3.0])
+        # wd0 = np.array([0.1, 0.2, 0.3])
+        # self.qdd = np.array([0.1, 0.5, 1.0, 1.5])
 
-        # Centroid accelerations (linear and angular)
-        self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
-                                        self.qd, self.qdd, self.BB, self.j_type,
-                                        self.cc, self.Ez)
-        return
+        # # Centroid accelerations (linear and angular)
+        # self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
+        #                                 self.qd, self.qdd, self.BB, self.j_type,
+        #                                 self.cc, self.Ez)
+        # return
 
     def calc_CoM(self):
         """

@@ -161,7 +161,7 @@ def calc_je(RR, AA, q, seq_link, j_type, cc, ce, Qe, Ez, ie):
     return Jacobian
 
 
-def calc_aa(Q0, q, BB, j_type, Qi):
+def calc_aa(A0, q, BB, j_type, Qi):
     """
     Returns the rotation matrices of all bodies (centroid and joint frames are
     always parallel).
@@ -171,7 +171,7 @@ def calc_aa(Q0, q, BB, j_type, Qi):
     AA = np.zeros((3, 3*num_b))
 
     # Base
-    AA[:, 0:3] = rpy2dc(Q0).T
+    AA[:, 0:3] = A0
 
     # Links
     for i in range(1, num_b):

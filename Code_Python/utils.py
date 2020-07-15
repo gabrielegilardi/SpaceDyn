@@ -45,17 +45,6 @@ def rotZ(theta=0.0):
     return Rz
 
 
-def tilde(a):
-    """
-    Converts a vector to the skew-symmetric matrix.
-    """
-    B = np.array([[  0.0, -a[2],  a[1]],
-                  [ a[2],   0.0, -a[0]],
-                  [-a[1],  a[0],   0.0]])
-
-    return B
-
-
 def rpy2dc(*args):
     """
     Converts RPY (XYZ) angles to the direction cosine matrix.
@@ -85,16 +74,16 @@ def dc2rpy(C):
     # Singular solution
     if (np.abs(C[1, 0]) < eps and np.abs(C[0, 0] < eps)):
         rpy[2] = 0.0
-        rpy[1] = np.atan2(C[2, 0], C[0, 0])
-        rpy[0] = np.atan2(C[1, 2], C[1, 1])
+        rpy[1] = np.arctan2(C[2, 0], C[0, 0])
+        rpy[0] = np.arctan2(C[1, 2], C[1, 1])
 
     # Non singular solution
     else:
-        rpy[2] = np.atan2(-C[1, 0], C[0, 0])
+        rpy[2] = np.arctan2(-C[1, 0], C[0, 0])
         c3 = np.cos(rpy[2])
         s3 = np.sin(rpy[2])
-        rpy[1] = np.atan2(C[2, 0], c3 * C[0, 0] - s3 * C[1, 0])
-        rpy[0] = np.atan2(-C[2, 1], C[2, 2])
+        rpy[1] = np.arctan2(C[2, 0], c3 * C[0, 0] - s3 * C[1, 0])
+        rpy[0] = np.arctan2(-C[2, 1], C[2, 2])
 
     return rpy
 
@@ -128,18 +117,29 @@ def dc2eul(C):
     # Singular solution
     if (np.abs(C[0, 2]) < eps and np.abs(C[1, 2] < eps)):
         eul[2] = 0.0
-        eul[1] = atan2(C[1, 2], C[2, 2])
-        eul[0] = atan2(C[0, 1], C[0, 0])
+        eul[1] = np.arctan2(C[1, 2], C[2, 2])
+        eul[0] = np.arctan2(C[0, 1], C[0, 0])
 
     # Non singular solution
     else:
-        eul[2] = atan2(C[0, 2], C[1, 2])
-        c3 = cos(eul[2])
-        s3 = sin(eul[2])
-        eul[1] = atan2(s3 * C[0, 2] + c3 * C[1, 2], C[2, 2])
-        eul[0] = atan2(C[2, 0], -C[2, 1])
+        eul[2] = np.arctan2(C[0, 2], C[1, 2])
+        c3 = np.cos(eul[2])
+        s3 = np.sin(eul[2])
+        eul[1] = np.arctan2(s3 * C[0, 2] + c3 * C[1, 2], C[2, 2])
+        eul[0] = np.arctan2(C[2, 0], -C[2, 1])
 
     return eul
+
+
+def tilde(a):
+    """
+    Converts a vector to the skew-symmetric matrix.
+    """
+    B = np.array([[  0.0, -a[2],  a[1]],
+                  [ a[2],   0.0, -a[0]],
+                  [-a[1],  a[0],   0.0]])
+
+    return B
 
 
 def cross(u, v):
@@ -204,27 +204,50 @@ def rotW(w0, dt):
 def inertia_matrix(shape, *args):
     """
     Returns the moments of inertia wrt the centroid for basic shapes.
+
+    Note: inertia for unit of mass !!!!!
+
+    Explain meaning geometric quantities
     """
     inertia = np.zeros((3, 3))
 
     # Thick-walled cylindrical tube: Re, Ri, H
     # Set Ri = 0 for a solid cylindrical tube
+    # case Re = Ri ?????
     if (shape == 'Cylinder'):
         Re = args[0]
         Ri = args[1]
-        H = args[2]
-        inertia[0, 0] = (Re * Re + Ri * Ri) / 2.0
-        inertia[1, 1] = (3.0 * Re * Re + 3.0 * Ri * Ri + H * H) / 12.0
+        L = args[2]
+        inertia[0, 0] = (Re ** 2 + Ri ** 2) / 2.0
+        inertia[1, 1] = (3.0 * Re ** 2 + 3.0 * Ri **2 + L ** 2) / 12
         inertia[2, 2] = inertia[1, 1]
 
     # Thick-walled sphere: Re, Ri
     # Set Ri = 0 for a solid sphere
-    elif (shape == 'Sphere'):
+    # case Re = Ri ?????
+        elif (shape == 'Sphere'):
         Re = args[0]
         Ri = args[1]
-        inertia[0, 0] = 0.4 * (Re ** 5.0 - Ri ** 5.0) / (Re ** 3.0 - Ri ** 3.0)
+        inertia[0, 0] = 0.4 * (Re ** 5 - Ri ** 5) / (Re ** 3 - Ri ** 3)
         inertia[1, 1] = inertia[0, 0]
         inertia[2, 2] = inertia[0, 0]
+
+    # Slender bar
+    elif(shape == 'Bar'):
+        L = args[0]
+        inertia[0, 0] = 0.0
+        inertia[1, 1] = L ** 2 / 12
+        inertia[2, 2] = inertia[1, 1]
+
+    # Rectangular prism
+    # hollow case with thickness???
+    elif(shape == 'Prism'):
+        L = args[0]
+        B = args[1]
+        H = args[2]
+        inertia[0, 0] = (B ** 2 + H ** 2) / 12
+        inertia[1, 1] = (L ** 2 + H ** 2) / 12
+        inertia[2, 2] = (L ** 2 + B ** 2) / 12
 
     # Default is the unit matrix
     else:
