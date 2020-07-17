@@ -288,7 +288,7 @@ def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
     wd0 = wd0_tmp
     wd0_pred = wd0
     w0_pred = w0 + k4 *(wd0 + wd0_pred)
-    A0_pred = rotW(w0_pred) @ A0
+    A0_pred = rotW(w0_pred, dt) @ A0
 
     # 2nd step: correction
     for i in range(n_reps):
@@ -316,7 +316,7 @@ def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
         wd0 = wd0_tmp
         wd0_corr = wd0
         w0_corr = w0 + k4 *(wd0 + wd0_corr)
-        A0_corr = rotW(w0_corr) @ A0
+        A0_corr = rotW(w0_corr, dt) @ A0
    
         # Next step
         R0_pred = R0_corr
@@ -341,7 +341,7 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
                                       mass, inertia, Qe, SS)
 
     k1_R0 = v0 * dt
-    k1_A0 = rotW(w0) @ A0 - A0
+    k1_A0 = rotW(w0, dt) @ A0 - A0
     k1_q  = qd * dt
     k1_v0 = vd0_tmp * dt
     k1_w0 = wd0_tmp * dt
@@ -355,7 +355,7 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
                                       j_type, Qi, cc, Ez, mass, inertia, Qe, SS)
 
     k2_R0 = (v0 + k1_v0 / 2.0) * dt
-    k2_A0 = rotW(w0 + k1_w0 / 2.0) @ A0 - A0
+    k2_A0 = rotW(w0 + k1_w0 / 2.0, dt) @ A0 - A0
     k2_q  = (qd + k1_qd / 2.0) * dt
     k2_v0 = vd0_tmp * dt
     k2_w0 = wd0_tmp * dt
@@ -369,7 +369,7 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
                                       j_type, Qi, cc, Ez, mass, inertia, Qe, SS)
 
     k3_R0 = (v0 + k2_v0 / 2.0) * dt
-    k3_A0 = rotW(w0 + k2_w0 / 2.0) @ A0 - A0
+    k3_A0 = rotW(w0 + k2_w0 / 2.0, dt) @ A0 - A0
     k3_q  = (qd + k2_qd / 2.0) * dt
     k3_v0 = vd0_tmp * dt
     k3_w0 = wd0_tmp * dt
@@ -382,7 +382,7 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
                                       j_type, Qi, cc, Ez, mass, inertia, Qe, SS)
 
     k4_R0 = (v0 + k3_v0) * dt
-    k4_A0 = rotW(w0 + k3_w0) @ A0 - A0
+    k4_A0 = rotW(w0 + k3_w0, dt) @ A0 - A0
     k4_q  = (qd + k3_qd) * dt
     k4_v0 = vd0_tmp * dt
     k4_w0 = wd0_tmp * dt

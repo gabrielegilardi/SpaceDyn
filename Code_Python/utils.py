@@ -12,141 +12,138 @@ Python version of:
 import numpy as np
 
 
-def rotX(theta=0.0):
+def rotX(alpha=0.0):
     """
-    Rotation about axis X.
+    Returns the rotation matrix for a rotation <alpha> about axis X.
     """
     Rx = np.array([[1.0,            0.0,            0.0],
-                   [0.0,  np.cos(theta),  np.sin(theta)],
-                   [0.0, -np.sin(theta),  np.cos(theta)]])
+                   [0.0,  np.cos(alpha),  np.sin(alpha)],
+                   [0.0, -np.sin(alpha),  np.cos(alpha)]])
 
     return Rx
 
 
-def rotY(theta=0.0):
+def rotY(beta=0.0):
     """
-    Rotation about axis Y.
+    Returns the rotation matrix for a rotation <beta> about axis Y.
     """
-    Ry = np.array([[ np.cos(theta), 0.0, -np.sin(theta)],
-                   [           0.0, 1.0,            0.0],
-                   [ np.sin(theta), 0.0,  np.cos(theta)]])
+    Ry = np.array([[ np.cos(beta), 0.0, -np.sin(beta)],
+                   [          0.0, 1.0,           0.0],
+                   [ np.sin(beta), 0.0,  np.cos(beta)]])
 
     return Ry
 
 
-def rotZ(theta=0.0):
+def rotZ(gamma=0.0):
     """
-    Rotation about axis Z.
+    Returns the rotation matrix for a rotation <gamma> about axis Z.
     """
-    Rz = np.array([[ np.cos(theta),  np.sin(theta), 0.0],
-                   [-np.sin(theta),  np.cos(theta), 0.0],
+    Rz = np.array([[ np.cos(gamma),  np.sin(gamma), 0.0],
+                   [-np.sin(gamma),  np.cos(gamma), 0.0],
                    [           0.0,            0.0, 1.0]])
 
     return Rz
 
 
-def rpy2dc(*args):
+def rpy2dc(rpy):
     """
-    Converts RPY (XYZ) angles to the direction cosine matrix.
+    Returns the rotation matrix for a set of RPY angles.
+
+    Note: RPY (roll-pitch-yaw) angles corresponds to the X-Y-Z fixed-angles
+          representation.
     """
-    # Passed as single argument (array of three elements)
-    if (len(args) == 1):
-        rpy = args[0]
-        C = rotZ(rpy[2]) @ rotY(rpy[1]) @ rotX(rpy[0])
+    rpy = np.asarray(rpy).flatten()
+    R = rotZ(rpy[2]) @ rotY(rpy[1]) @ rotX(rpy[0])
 
-    # Passed as three separate arguments
-    else:
-        roll = args[0]
-        pitch = args[1]
-        yaw = args[2]
-        C = rotZ(yaw) @ rotY(pitch) @ rotX(roll)
-
-    return C
+    return R
 
 
-def dc2rpy(C):
+def dc2rpy(R):
     """
-    Converts a direction cosine matrix to RPY (XYZ) angles.
+    Returns the RPY angles for the specified rotation matrix.
+
+    Notes:
+    - in the singular case (where there are an infinite number of solution) the
+      solution with yaw angle equal to zero is chosen.
+    - in the general case (where there are always two solutions) the positive
+      solution for the pitch angle is chosen.
     """
     rpy = np.zeros(3)
     eps = np.finfo(float).eps
 
     # Singular solution
-    if (np.abs(C[1, 0]) < eps and np.abs(C[0, 0] < eps)):
+    if (np.abs(R[0, 0]) < eps and np.abs(R[1, 0] < eps)):
         rpy[2] = 0.0
-        rpy[1] = np.arctan2(C[2, 0], C[0, 0])
-        rpy[0] = np.arctan2(C[1, 2], C[1, 1])
+        rpy[1] = np.arctan2(R[2, 0], R[0, 0])
+        rpy[0] = np.arctan2(R[1, 2], R[1, 1])
 
     # Non singular solution
     else:
-        rpy[2] = np.arctan2(-C[1, 0], C[0, 0])
-        c3 = np.cos(rpy[2])
-        s3 = np.sin(rpy[2])
-        rpy[1] = np.arctan2(C[2, 0], c3 * C[0, 0] - s3 * C[1, 0])
-        rpy[0] = np.arctan2(-C[2, 1], C[2, 2])
+        rpy[2] = np.arctan2(-R[1, 0], R[0, 0])
+        c2 = np.cos(rpy[2])
+        s2 = np.sin(rpy[2])
+        rpy[1] = np.arctan2(R[2, 0], c2 * R[0, 0] - s2 * R[1, 0])
+        rpy[0] = np.arctan2(-R[2, 1], R[2, 2])
 
     return rpy
 
 
-def eul2dc(*args):
+def eul2dc(eul):
     """
-    Converts Eulero (ZXZ) angles to the direction cosine matrix.
+    Returns the rotation matrix for a set of Z-X-Z Euler angles.
     """
-    # Passed as single argument (array of three elements)
-    if (len(args) == 1):
-        eul = args[0]
-        C = rotZ(eul[2]) @ rotX(eul[1]) @ rotZ(eul[0])
+    eul = np.asarray(eul).flatten()
+    R = rotZ(eul[2]) @ rotX(eul[1]) @ rotZ(eul[0])
 
-    # Passed as three separate arguments
-    else:
-        phi = args[0]
-        theta = args[1]
-        psi = args[2]
-        C = rotZ(psi) @ rotX(theta) @ rotZ(phi)
-
-    return C
+    return R
 
 
-def dc2eul(C):
+def dc2eul(R):
     """
-    Converts a direction cosine matrix to Eulero (ZXZ) angles.
+    Returns the Z-X-Z Euler angles for the specified rotation matrix.
+
+    Notes:
+    - in the singular case (where there are an infinite number of solution) the
+      solution with the third angle equal to zero is chosen.
+    - in the general case (where there are always two solutions) the positive
+      solution for the X angle is chosen.
     """
     eul = np.zeros(3)
     eps = np.finfo(float).eps
 
     # Singular solution
-    if (np.abs(C[0, 2]) < eps and np.abs(C[1, 2] < eps)):
+    if (np.abs(R[0, 2]) < eps and np.abs(R[1, 2] < eps)):
         eul[2] = 0.0
-        eul[1] = np.arctan2(C[1, 2], C[2, 2])
-        eul[0] = np.arctan2(C[0, 1], C[0, 0])
+        eul[1] = np.arctan2(R[1, 2], R[2, 2])
+        eul[0] = np.arctan2(R[0, 1], R[0, 0])
 
     # Non singular solution
     else:
-        eul[2] = np.arctan2(C[0, 2], C[1, 2])
-        c3 = np.cos(eul[2])
-        s3 = np.sin(eul[2])
-        eul[1] = np.arctan2(s3 * C[0, 2] + c3 * C[1, 2], C[2, 2])
-        eul[0] = np.arctan2(C[2, 0], -C[2, 1])
+        eul[2] = np.arctan2(R[0, 2], R[1, 2])
+        c2 = np.cos(eul[2])
+        s2 = np.sin(eul[2])
+        eul[1] = np.arctan2(s2 * R[0, 2] + c2 * R[1, 2], R[2, 2])
+        eul[0] = np.arctan2(R[2, 0], -R[2, 1])
 
     return eul
 
 
 def tilde(a):
     """
-    Converts a vector to the skew-symmetric matrix.
+    Returns the the skew-symmetric matrix of a vector.
     """
-    B = np.array([[  0.0, -a[2],  a[1]],
-                  [ a[2],   0.0, -a[0]],
-                  [-a[1],  a[0],   0.0]])
+    B_skew = np.array([[  0.0, -a[2],  a[1]],
+                       [ a[2],   0.0, -a[0]],
+                       [-a[1],  a[0],   0.0]])
 
-    return B
+    return B_skew
 
 
 def cross(u, v):
     """
-    Cross product between two vectors
+    Returns the cross product between two vectors or a set vectors.
     """
-    # Arguments are two vectors
+    # Arguments are two vectors --> standard cross product
     if (u.ndim == 1):
         n = np.zeros(3)
         n[0] = u[1] * v[2] - u[2] * v[1]
@@ -164,41 +161,21 @@ def cross(u, v):
     return n
 
 
-def tr2diff(A1, A2):
+def rotW(w, dt):
     """
-    Calculates the difference between two rotation matrices (RPY angles).
-
-    Notes:
-    - correct only for small angles.
-    - fail if the angle difference is 180 degrees.
+    Returns a rotation matrix representing the rotation |w| x dt about the
+    angular velocity vector <w> using Rodrigues' formulation.
     """
-    b = (cross(A2[:, 0], A1[:, 0]) + cross(A2[:, 1], A1[:, 1])
-        + cross(A2[:, 2], A1[:, 2])) / 2.0
+    w = np.asarray(w).flatten()
+    w_norm = np.linalg.norm(w)      # Norm
+    K = w / w_norm                  # Unit vector defining the rotation axis
+    theta = w_norm * dt             # Rotation
+    K_tilde = tilde(K)
+    st = np.sin(theta)
+    ct = np.cos(theta)
+    R = np.eye(3) + st * K_tilde + (1 - ct) * K_tilde @ K_tilde
 
-    return b
-
-
-def rotW(w0, dt):
-    """
-    Returns a transformation matrix representing a rotation <dt> about the
-    vector w0.
-    """
-    nw0 = np.linalg.norm(w0)
-    eps = np.finfo(float).eps
-
-    if (np.abs(nw0) < eps):
-        E0 = np.identity(3)         # No rotation
-
-    else:
-        theta = nw0 * dt
-        w = w0 / nw0
-        ct = np.cos(theta)
-        st = np.sin(theta)
-        E0 = np.array([[        ct+(1-ct)*w[0]**2, (1-ct)*w[0]*w[1]-st*w[2], (1-ct)*w[0]*w[2]+st*w[1] ],
-                       [ (1-ct)*w[0]*w[1]+st*w[2],        ct+(1-ct)*w[1]**2, (1-ct)*w[1]*w[2]-st*w[0] ],
-                       [ (1-ct)*w[0]*w[2]-st*w[1], (1-ct)*w[1]*w[2]+st*w[0],        ct+(1-ct)*w[2]**2 ]])
-
-    return E0
+    return R
 
 
 def inertia_matrix(shape, *args):
@@ -219,13 +196,13 @@ def inertia_matrix(shape, *args):
         Ri = args[1]
         L = args[2]
         inertia[0, 0] = (Re ** 2 + Ri ** 2) / 2.0
-        inertia[1, 1] = (3.0 * Re ** 2 + 3.0 * Ri **2 + L ** 2) / 12
+        inertia[1, 1] = (3.0 * Re ** 2 + 3.0 * Ri ** 2 + L ** 2) / 12
         inertia[2, 2] = inertia[1, 1]
 
     # Thick-walled sphere: Re, Ri
     # Set Ri = 0 for a solid sphere
     # case Re = Ri ?????
-        elif (shape == 'Sphere'):
+    elif (shape == 'Sphere'):
         Re = args[0]
         Ri = args[1]
         inertia[0, 0] = 0.4 * (Re ** 5 - Ri ** 5) / (Re ** 3 - Ri ** 3)

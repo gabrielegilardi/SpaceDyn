@@ -103,91 +103,106 @@ test = sys.argv[1]
 
 if (test == 'utils'):
 
-    print('Data:')
-    roll = pi/6     # 30 deg
-    pitch = pi/3    # 60 deg
-    yaw = pi/4      # 45 deg
-    phi = pi/6      # 30 deg
-    theta = pi/3    # 60 deg
-    psi = pi/4      # 45 deg
-    print('\nroll= ', roll, 'pitch=', pitch, 'yaw= ', yaw)
-    print('\nphi= ', phi, 'theta=', theta, 'psi= ', psi)
+    print('\nData:')
+    roll = pi/6
+    pitch = pi/3
+    yaw = pi/4
+    V1 = np.array([1.1, 2.2, 3.3])
+    V2 = np.array([0.7, -0.2, -2.4])
+    M1 = np.tile(V1.reshape(3,1), (1, 5))
+    M2 = np.tile(V2.reshape(3,1), (1, 5))
+    w = np.array([0.4, -0.7, 0.3])
+    dt = 0.2
+    print('roll= ', roll)
+    print('pitch=', pitch)
+    print('yaw= ', yaw)
+    print('V1= ', V1)
+    print('V2= ', V2)
+    print('M1=')
+    print(M1)
+    print('M2=')
+    print(M2)
+    print('dt= ', dt)
 
-    print('\nSimple rotation in X')
+    print('\nRotation about X')
     # [[ 1.         0.         0.       ]
     #  [ 0.         0.8660254  0.5      ]
     #  [ 0.        -0.5        0.8660254]]
-    rotX = utils.rotX(roll)
-    print(rotX)
+    Rx = utils.rotX(roll)
+    print(Rx)
 
-    print('\nSimple rotation in Y')
+    print('\nRotation about Y')
     # [[ 0.8660254  0.       -0.5      ]
     # [ 0.         1.         0.       ]
     # [ 0.5        0.         0.8660254]]
-    rotY = utils.rotY(roll)
-    print(rotY)
+    Ry = utils.rotY(roll)
+    print(Ry)
 
-    print('\nSimple rotation in Z')
+    print('\nRotation about Z')
     # [[ 0.8660254  0.5        0.       ]
     #  [-0.5        0.8660254  0.       ]
     #  [ 0.         0.         1.       ]]    
-    rotZ = utils.rotZ(roll)
-    print(rotZ)
+    Rz = utils.rotZ(roll)
+    print(Rz)
 
-    print('\nRotation matrix from RPY angles (array)')
+    print('\nRotation matrix from RPY angles')
     # [[ 0.35355339  0.91855865 -0.1767767 ]
     #  [-0.35355339  0.30618622  0.88388348]
-    #  [ 0.8660254  -0.25        0.4330127 ]]    
-    Cmat = utils.rpy2dc(np.array([roll, pitch, yaw]))
-    print(Cmat)
-
-    print('\nRotation matrix from RPY angles (scalars)')
-    # [[ 0.35355339  0.91855865 -0.1767767 ]
-    #  [-0.35355339  0.30618622  0.88388348]
-    #  [ 0.8660254  -0.25        0.4330127 ]]    
-    Cmat = utils.rpy2dc(roll, pitch, yaw)
-    print(Cmat)
+    #  [ 0.8660254  -0.25        0.4330127 ]]  
+    R = utils.rpy2dc(np.array([roll, pitch, yaw]))
+    print(R)
 
     print('\nRPY angles from rotation matrix (general case)')
-    # [0.52359878 1.04719755 0.78539816]
-    rpy = utils.dc2rpy(Cmat)
+    # [0.52359878 1.04719755 0.78539816], shape (3, )
+    rpy = utils.dc2rpy(R)
     print(rpy)
 
     print('\nRPY angles from rotation matrix (singular case)')
-    # [1.30899694 1.57079633 0.        ]
-    Cmat = utils.rpy2dc(roll, pi/2, yaw)
-    rpy = utils.dc2rpy(Cmat)
+    # [1.30899694 1.57079633 0.        ], shape (3, )
+    R = utils.rpy2dc(np.array([roll, pi/2, yaw]))
+    rpy = utils.dc2rpy(R)
     print(rpy)
 
-    print('\nRotation matrix from Euler angles (array)')
+    print('\nRotation matrix from Euler angles')
     # [[ 0.43559574  0.65973961  0.61237244]
     #  [-0.78914913 -0.04736717  0.61237244]
     #  [ 0.4330127  -0.75        0.5       ]]
-    Cmat = utils.eul2dc(np.array([phi, theta, psi]))
-    print(Cmat)
-
-    print('\nRotation matrix from Euler angles (scalars)')
-    # [[ 0.43559574  0.65973961  0.61237244]
-    #  [-0.78914913 -0.04736717  0.61237244]
-    #  [ 0.4330127  -0.75        0.5       ]]
-    Cmat = utils.eul2dc(phi, theta, psi)
-    print(Cmat)
+    R = utils.eul2dc(np.array([roll, pitch, yaw]))
+    print(R)
 
     print('\nEuler angles from rotation matrix (general case)')
-    # [0.52359878 1.04719755 0.78539816]
-    eul = utils.dc2eul(Cmat)
+    # [0.52359878 1.04719755 0.78539816], shape (3, )
+    eul = utils.dc2eul(R)
     print(eul)
 
     print('\nEuler angles from rotation matrix (singular case)')
-    # [1.30899694 0.         0.        ]
-    Cmat = utils.eul2dc(phi, 0.0, psi)
-    eul = utils.dc2eul(Cmat)
+    # [1.30899694 0.         0.        ], shape (3, )
+    R = utils.eul2dc(np.array([roll, 0.0, yaw]))
+    eul = utils.dc2eul(R)
     print(eul)
 
-    print('\nSkew-symmetric matrix from vactor')
+    print('\nSkew-symmetric matrix from vector')
     # [[ 0.         -0.78539816  1.04719755]
     #  [ 0.78539816  0.         -0.52359878]
     #  [-1.04719755  0.52359878  0.        ]]
-    Bmat = utils.tilde(np.array([roll, pitch, yaw]))
-    print(Bmat)
+    B_skew = utils.tilde(np.array([roll, pitch, yaw]))
+    print(B_skew)
 
+    print('\nCross product (two vectors)')
+    # [-4.62  4.95 -1.76], shape (3, )
+    V12 = utils.cross(V1, V2)
+    print(V12)
+
+    print('\nCross product (two matrices)')
+    # [[-4.62 -4.62 -4.62 -4.62 -4.62]
+    #  [ 4.95  4.95  4.95  4.95  4.95]
+    #  [-1.76 -1.76 -1.76 -1.76 -1.76]]    
+    M12 = utils.cross(M1, M2)
+    print(M12)
+
+    print('\nRotation matrix for a rotation about a vector')
+    # [[ 0.98842859 -0.06529064 -0.13691627]
+    #  [ 0.05411824  0.99501232 -0.08379557]
+    #  [ 0.14170444  0.07541627  0.98703204]]
+    R = utils.rotW(w, dt)
+    print(R)
