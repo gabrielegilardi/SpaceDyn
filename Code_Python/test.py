@@ -29,17 +29,17 @@ d2r = 180.0 / pi
 
 # 0 - Foot (base)
 name = 'foot/base'
-mass = 2.3
-inertia = 1.5 * np.eye(3)
+mass = 2.35
+inertia = mass * utils.inertia('none')
 cc = {1: [-0.15, 0.05, 0.0]}      # Leg connection
 foot = element.base(name=name, mass=mass, inertia=inertia, cc=cc)
 
 # 1 - Leg
 name = 'leg'
-mass = 0.4
-inertia = 0.75 * np.eye(3)
-j_type = 'R'
-Qi = [0.0, 0.0, pi/6]
+mass = 0.43
+inertia = mass * utils.inertia('cylinder', 0.2, 0.1, 0.4)
+j_type = 'P'
+Qi = [0.0, 0.0, pi/4]
 cc = {1: [-0.25, 0.0, 0.0],      # Foot/base connection
       2: [ 0.20, 0.0, 0.0],      # Trunk connection
       4: [ 0.20, 0.0, 0.0]}      # Lower arm connection
@@ -48,10 +48,10 @@ leg = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
 
 # 2 - Trunk
 name = 'trunk'
-mass = 1.4
-inertia = 0.5 * np.eye(3)
+mass = 1.41
+inertia = mass * utils.inertia('sphere', 0.3, 0.15)
 j_type = 'R'
-Qi = [0.0, 0.0, -pi/6]
+Qi = [0.0, -pi/6, 0.0]
 cc = {2: [-0.2, 0.0, 0.0],      # Leg connection
       3: [ 0.3, 0.0, 0.0]}      # Upper arm connection
 trunk = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
@@ -59,8 +59,8 @@ trunk = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
 
 # 3 - Upper arm
 name = 'upper arm'
-mass = 0.7
-inertia = 2.0 * np.eye(3)
+mass = 0.72
+inertia = mass * utils.inertia('bar', 0.5)
 j_type = 'R'
 cc = {3: [-0.15, 0.0, 0.0]}      # Trunk connection
 upperArm = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
@@ -68,19 +68,18 @@ upperArm = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
 
 # 4 - Lower arm
 name = 'lower arm'
-mass = 0.8
-inertia = 4.0 * np.eye(3)
-j_type = 'R'
+mass = 0.88
+inertia = mass * utils.inertia('prism', 0.1, 0.2, 0.6)
+j_type = 'P'
+Qi = [0.0, 0.0, pi/3]
 cc = {4: [-0.23, 0.0, 0.0]}      # Leg connection
 lowerArm = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
-                        cc=cc)
+                        Qi=Qi, cc=cc)
 
 name = 'simple robot'
 ee = {
-      0: (0, [0.4, -0.05, 0.0], [ 0.0,  0.0, -pi/2]),
-      2: (3, [0.13, 0.0,  0.0], [ 0.0,  pi/2, pi/2]),
-      1: (3, [0.15, 0.0,  0.0], [ 0.0, -pi/2, pi/2]),
-      3: (4, [0.17, 0.0,  0.0], [-pi/2, pi/2, 0.0])
+      0: (3, [0.4, -0.05, 0.5], [ 0.0,  0.0, -pi/4]),
+      1: (4, [0.15, 0.0,  1.0], [ 0.0, -pi/3, pi/2]),
      }
 bodies = [foot, leg, trunk, upperArm, lowerArm]
 robot = element.model(name=name, bodies=bodies, ee=ee)
@@ -101,7 +100,109 @@ if len(sys.argv) != 2:
     sys.exit(1)
 test = sys.argv[1]
 
-if (test == 'utils'):
+if (test == 'conn'):
+
+    print('\nBodies upper connection(s) matrix')
+    # [[-1  1  0  0  0]
+    #  [ 0 -1  1  0  1]
+    #  [ 0  0 -1  1  0]
+    #  [ 0  0  0 -1  0]
+    #  [ 0  0  0  0 -1]]
+    SS = robot.SS
+    print(SS)
+
+    print('\nBodies endpoint(s) vector')
+    # [0 3 3 4], shape (num_e, )
+    SE = robot.SE
+    print(SE)
+
+    print('\nLinks lower connection vector')
+    # [0 1 2 1], shape (num_j, )
+    BB = robot.BB
+    print(BB)
+
+elif (test == 'prop'):
+    
+    print('\nMasses')
+    # [2.35 0.43 1.41 0.72 0.88], shape (num_b, )
+    print(robot.mass)
+
+    print('\nInertia (transpose)')
+    # [[2.35       0.         0.        ]
+    #  [0.         2.35       0.        ]
+    #  [0.         0.         2.35      ]
+    #  [0.01110833 0.         0.        ]
+    #  [0.         0.01110833 0.        ]
+    #  [0.         0.         0.01075   ]
+    #  [0.05619857 0.         0.        ]
+    #  [0.         0.05619857 0.        ]
+    #  [0.         0.         0.05619857]
+    #  [0.015      0.         0.        ]
+    #  [0.         0.015      0.        ]
+    #  [0.         0.         0.        ]
+    #  [0.02713333 0.         0.        ]
+    #  [0.         0.00366667 0.        ]
+    #  [0.         0.         0.02933333]]
+    print(robot.inertia.T)
+
+    print('\nJoint type')
+    # ['P', 'R', 'R', 'P'], shape (num_j, )
+    print(robot.j_type)
+
+    print('\nBody-to-body connections')
+    # cc[0, :, :] = X coordinate
+    # [[[ 0.   -0.15  0.    0.    0.  ]
+    #   [ 0.   -0.25  0.2   0.    0.2 ]
+    #   [ 0.    0.   -0.2   0.3   0.  ]
+    #   [ 0.    0.    0.   -0.15  0.  ]
+    #   [ 0.    0.    0.    0.   -0.23]]
+    #
+    # cc[1, :, :] = Y coordinate
+    #  [[ 0.    0.05  0.    0.    0.  ]
+    #   [ 0.    0.    0.    0.    0.  ]
+    #   [ 0.    0.    0.    0.    0.  ]
+    #   [ 0.    0.    0.    0.    0.  ]
+    #   [ 0.    0.    0.    0.    0.  ]]
+    #
+    # cc[2, :, :] = Z coordinate
+    #  [[ 0.    0.    0.    0.    0.  ]
+    #   [ 0.    0.    0.    0.    0.  ]
+    #   [ 0.    0.    0.    0.    0.  ]
+    #   [ 0.    0.    0.    0.    0.  ]
+    #   [ 0.    0.    0.    0.    0.  ]]]
+    print(robot.cc)
+
+    print('\nJoint/centroid frames')
+    # [[ 0.          0.          0.          0.        ]
+    #  [ 0.         -0.52359878  0.          0.        ]
+    #  [ 0.78539816  0.          0.          1.04719755]]
+    print(robot.Qi)
+
+    print('\nBody-to-endpoint connections')
+    # [[ 0.4   0.15]
+    #  [-0.05  0.  ]
+    #  [ 0.5   1.  ]]
+    print(robot.ce)
+
+    print('\nEndpoint frames')
+    # [[ 0.          0.        ]
+    #  [ 0.         -1.04719755]
+    #  [-0.78539816  1.57079633]]    
+    print(robot.Qe)
+
+elif (test == 'rot'):
+    pass
+
+elif (test == 'pos'):
+    pass
+
+elif (test == 've'):
+    pass
+
+elif (test == 'acc'):
+    pass
+
+elif (test == 'utils'):
 
     print('\nData:')
     roll = pi/6

@@ -21,11 +21,10 @@ def connectivity(bodies, ee):
     Builds the connectivity matrices.
 
     SS[i, k]        +1 = the i-th body is connected to the k-th body
-                    -1 = i-th body own-connection (always present)
-                     0 = no connection between i-th and k-th body
-    SE[i]           +1 = the i-th body has and end-point
-                     0 = the i-th body does not have and end-point
-    BB[i]           Previous body
+                    -1 = i-th body self-connection (always present)
+                     0 = no connection between i-th and k-th bodies
+    SE[i]           list of bodies with endpoints
+    BB[i]           lower connection of each link (base is excluded)
 
     Note: no own joint or previous body for the base.
     """
@@ -86,7 +85,8 @@ def build_ce_Qe(ee):
     """
     Builds the matrices defining the endpoint positions and orientations.
 
-    ce[:, i]        Position from the centroid of the i-th body to its endpoint
+    ce[:, i]        Position from the centroid of the SE[i]-th body to the
+                    i-th endpoint
     Qe[:, i]        Orientation of the end-point on the i-th body
 
     Note: position and orientation are wrt the centroid frame.
@@ -234,13 +234,12 @@ class model:
         self.SS, self.SE, self.BB = connectivity(self.bodies, self.ee)
 
         # Links and endpoints relative positions/orientations
-        self.cc, self_Qi = build_cc_Qi(self.bodies)
+        self.cc, self.Qi = build_cc_Qi(self.bodies)
         self.ce, self.Qe = build_ce_Qe(self.ee)
 
         # Properties
         self.mass, self.inertia = build_mass_inertia(self.bodies)
         self.j_type = build_j_type(self.joints)
-
 
     def info(self):
         """
@@ -277,7 +276,7 @@ class model:
         w0 = np.asarray(w0)
 
         # Joints (rotations/displacements and velocities)
-        if (len(q) >0):
+        if (len(q) > 0):
             self.q = q
         else:
             self.q = np.zeros(self.num_j)

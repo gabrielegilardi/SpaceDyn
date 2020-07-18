@@ -178,53 +178,60 @@ def rotW(w, dt):
     return R
 
 
-def inertia_matrix(shape, *args):
+def inertia(shape, *args):
     """
-    Returns the moments of inertia wrt the centroid for basic shapes.
+    Returns the moments of inertia for basic shapes.
 
-    Note: inertia for unit of mass !!!!!
-
-    Explain meaning geometric quantities
+    Note: the moments of inertia are for unit of mass and with respect to the
+          shape geometric center.
     """
     inertia = np.zeros((3, 3))
 
-    # Thick-walled cylindrical tube: Re, Ri, H
-    # Set Ri = 0 for a solid cylindrical tube
-    # case Re = Ri ?????
-    if (shape == 'Cylinder'):
+    # Thick-walled cylinder
+    # Re = args[0] = outer radius
+    # Ri = args[1] = inner radius
+    # L  = args[2] = length (along Z axis)
+    # Set Ri = 0 for a solid cylinder
+    # Set Ri = Re for a thin cylindrical shell
+    if (shape == 'cylinder'):
         Re = args[0]
         Ri = args[1]
         L = args[2]
-        inertia[0, 0] = (Re ** 2 + Ri ** 2) / 2.0
-        inertia[1, 1] = (3.0 * Re ** 2 + 3.0 * Ri ** 2 + L ** 2) / 12
-        inertia[2, 2] = inertia[1, 1]
+        inertia[0, 0] = (3.0 * Re ** 2 + 3.0 * Ri ** 2 + L ** 2) / 12.0
+        inertia[1, 1] = (3.0 * Re ** 2 + 3.0 * Ri ** 2 + L ** 2) / 12.0
+        inertia[2, 2] = (Re ** 2 + Ri ** 2) / 2.0
 
-    # Thick-walled sphere: Re, Ri
+    # Thick-walled sphere
+    # Re = args[0] = outer radius
+    # Ri = args[1] = inner radius
     # Set Ri = 0 for a solid sphere
-    # case Re = Ri ?????
-    elif (shape == 'Sphere'):
+    # Set Ri = Re for a thin spherical shell
+    elif (shape == 'sphere'):
         Re = args[0]
         Ri = args[1]
-        inertia[0, 0] = 0.4 * (Re ** 5 - Ri ** 5) / (Re ** 3 - Ri ** 3)
-        inertia[1, 1] = inertia[0, 0]
-        inertia[2, 2] = inertia[0, 0]
+        inertia[0, 0] = (2.0 / 5.0) * (Re ** 5 - Ri ** 5) / (Re ** 3 - Ri ** 3)
+        inertia[1, 1] = (2.0 / 5.0) * (Re ** 5 - Ri ** 5) / (Re ** 3 - Ri ** 3)
+        inertia[2, 2] = (2.0 / 5.0) * (Re ** 5 - Ri ** 5) / (Re ** 3 - Ri ** 3)
 
-    # Slender bar
-    elif(shape == 'Bar'):
+    # Slender bar (rod)
+    # L  = args[0] = length (along Z axis)
+    elif(shape == 'bar'):
         L = args[0]
-        inertia[0, 0] = 0.0
-        inertia[1, 1] = L ** 2 / 12
-        inertia[2, 2] = inertia[1, 1]
+        inertia[0, 0] = L ** 2 / 12.0
+        inertia[1, 1] = L ** 2 / 12.0
+        inertia[2, 2] = 0.0
 
     # Rectangular prism
-    # hollow case with thickness???
-    elif(shape == 'Prism'):
+    # B = args[0] = base (along X axis)
+    # H = args[1] = height (along Y axis)
+    # L = args[2] = length (along Z axis)
+    elif(shape == 'prism'):
         L = args[0]
         B = args[1]
         H = args[2]
-        inertia[0, 0] = (B ** 2 + H ** 2) / 12
-        inertia[1, 1] = (L ** 2 + H ** 2) / 12
-        inertia[2, 2] = (L ** 2 + B ** 2) / 12
+        inertia[0, 0] = (L ** 2 + H ** 2) / 12
+        inertia[1, 1] = (L ** 2 + B ** 2) / 12
+        inertia[2, 2] = (H ** 2 + B ** 2) / 12
 
     # Default is the unit matrix
     else:

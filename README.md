@@ -7,16 +7,16 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
 ## Implemented functions
 
 - File *elements.py*:
-  - init (new - class Base)
-  - info (new - class Base)
-  - init (new - class Link)
-  - info (new - class Link)
-  - init (new - class Model)
-  - info (new - class Model)
-  - connectivity (connectivity between bodies and endpoints)
-  - build_cc_Qi (position/orientation links)
-  - build_ce_Qe (position/orientation end-points)
-  - build_mass_inertia (system mass and inertia)
+  - init (new - class Base, tested)
+  - info (new - class Base, tested)
+  - init (new - class Link, tested)
+  - info (new - class Link, tested)
+  - init (new - class Model, tested)
+  - info (new - class Model, tested)
+  - connectivity (new - connectivity between bodies and endpoints, tested)
+  - build_cc_Qi (new - position/orientation links, tested)
+  - build_ce_Qe (new - position/orientation end-points, tested)
+  - build_mass_inertia (new - system mass and inertia, tested)
   - set_init (new - initialize system)
   - calc_CoM (new - position, velocity, and acceleration of the CoM)
   - calc_kin_ener (new - kinetic energy for system/links)
@@ -59,7 +59,7 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - dc2eul (rotation matrix to Euler angles, tested)
   - cross (single/multi-vector cross product, tested)
   - rotW (rotation vector to rotation matrix, tested)
-  - inertia_matrix (new - moments of inertia for basic shapes)
+  - inertia (new - moments of inertia for basic shapes, tested)
 
 - Functions done in Matlab but not ported in Python yet:
   - i_dyn (inverse dynamics)
