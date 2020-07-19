@@ -108,7 +108,7 @@ def build_mass_inertia(bodies):
     mass = [mass_1, mass_2, ... ]                       (num_b, )
     inertia = [inertia_1, inertia_2, ... ]              (3, 3*num_b)
 
-    Note: inertia_1 has indeces [:, 0:3], inertia_2 has indeces [:, 3:6], etc.
+    Note: the inertia matrices are with respect to the body centroids.
     """
     num_b = len(bodies)
     mass = np.zeros(num_b)
@@ -209,9 +209,7 @@ class link:
 
 class model:
 
-    def __init__(self, name=None, bodies=[], ee={},
-                 Gravity=np.array([-9.81, 0.0, 0.0]),
-                 Ez=np.array([0.0, 0.0, 1.0])):
+    def __init__(self, name=None, bodies=[], ee={}):
         """
         name        str         Name
         bodies      num_b       List of bodies
@@ -222,8 +220,6 @@ class model:
         self.name = name
         self.bodies = bodies
         self.ee = ee
-        self.Gravity = np.asarray(Gravity)
-        self.Ez = np.asarray(Ez)
 
         self.joints = self.bodies[1:]           # List of joints
         self.num_j = len(self.joints)           # Number of joints
@@ -261,7 +257,7 @@ class model:
 
         return
 
-    def set_init(self, R0=np.zeros(3), Q0=np.zeros(3), v0=np.zeros(3),
+    def set_init(self, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
                  w0=np.zeros(3), q=np.array([]), qd=np.array([])):
         """
         Initializes quantities at starting time.
@@ -270,8 +266,7 @@ class model:
         """
         # Base (position, orientation, and velocities)
         R0 = np.asarray(R0)
-        Q0 = np.asarray(Q0)
-        A0 = rpy2dc(Q0).T
+        A0 = np.asarray(A0)
         v0 = np.asarray(v0)
         w0 = np.asarray(w0)
 
@@ -285,16 +280,16 @@ class model:
         else:
             self.qd = np.zeros(self.num_j)
 
-        # # Link rotation matrices (link and joint frame are parallel)
-        # self.AA = kin.calc_aa(A0, self.q, self.BB, self.j_type, self.Qi)
+        # Rotation matrices (link and joint frame are parallel)
+        self.AA = kin.calc_aa(A0, self.q, self.BB, self.j_type, self.Qi)
 
-        # # Centroid positions
-        # self.RR = kin.calc_pos(R0, self.AA, self.q, self.BB, self.j_type,
-        #                        self.cc, self.Ez)
+        # Centroid positions
+        self.RR = kin.calc_pos(R0, self.AA, self.q, self.BB, self.j_type,
+                               self.cc)
 
-        # # Centroid velocities (linear and angular)
-        # self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
-        #                                 self.BB, self.j_type, self.cc, self.Ez)
+        # Centroid velocities (linear and angular)
+        self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
+                                        self.BB, self.j_type, self.cc)
 
         # # External forces
         # self.Fe, self.Te, self.tau = dyn.calc_Forces(self.num_j)
@@ -308,7 +303,7 @@ class model:
         # # Centroid accelerations (linear and angular)
         # self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
         #                                 self.qd, self.qdd, self.BB, self.j_type,
-        #                                 self.cc, self.Ez)
+        #                                 self.cc)
         # return
 
     def calc_CoM(self):

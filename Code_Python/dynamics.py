@@ -15,19 +15,6 @@ import kinematics as kin
 from utils import cross, rotW
 
 
-def calc_Forces(num_j=0):
-    """
-    Returns the external forces/moments/torques applied to base, links, and
-    joints.
-    """
-    num_b = num_j + 1
-    Fe = np.zeros((3, num_b))           # Forces on base and link end-points
-    Te = np.zeros((3, num_b))           # Moments on base and link end-points
-    tau = np.zeros(num_j)               # Torques/forces on joints
-
-    return Fe, Te, tau
-
-
 def r_ne(RR, AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te, SS, SE, j_type, cc, ce,
          mass, inertia, Ez, Gravity, BB):
     """

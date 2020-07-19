@@ -78,8 +78,8 @@ lowerArm = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
 
 name = 'simple robot'
 ee = {
-      0: (3, [0.4, -0.05, 0.5], [ 0.0,  0.0, -pi/4]),
-      1: (4, [0.15, 0.0,  1.0], [ 0.0, -pi/3, pi/2]),
+      0: (3, [0.4, -0.05, 0.5], [0.0,  0.0, -pi/4]),
+      1: (4, [0.15, 0.0,  1.0], [0.0, -pi/3, pi/2]),
      }
 bodies = [foot, leg, trunk, upperArm, lowerArm]
 robot = element.model(name=name, bodies=bodies, ee=ee)
@@ -87,11 +87,12 @@ robot = element.model(name=name, bodies=bodies, ee=ee)
 # Initial conditions
 R0 = np.array([1.0, 2.0, 3.0])
 Q0 = np.array([0.1, 0.2, 0.3])
-v0 = np.array([1.0, 2.0, 3.0])
-w0 = np.array([0.1, 0.2, 0.3])
+A0 = utils.rpy2dc(Q0).T
+v0 = np.array([1.3, -2.2, 3.7])
+w0 = np.array([-0.2, 0.5, -0.4])
 q = np.array([0.1, 0.5, 1.0, 1.5])
-qd = np.array([ 0.1, 0.2, 0.3, 0.4])
-robot.set_init(R0=R0, Q0=Q0, v0=v0, w0=w0, q=q, qd=qd)
+qd = np.array([-0.1, 0.2, -0.3, 0.4])
+robot.set_init(R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
 
 # ------- Test ------- #
 
@@ -100,7 +101,7 @@ if len(sys.argv) != 2:
     sys.exit(1)
 test = sys.argv[1]
 
-if (test == 'conn'):
+if (test == 'connectivity'):
 
     print('\nBodies upper connection(s) matrix')
     # [[-1  1  0  0  0]
@@ -121,8 +122,8 @@ if (test == 'conn'):
     BB = robot.BB
     print(BB)
 
-elif (test == 'prop'):
-    
+elif (test == 'properties'):
+
     print('\nMasses')
     # [2.35 0.43 1.41 0.72 0.88], shape (num_b, )
     print(robot.mass)
@@ -187,20 +188,102 @@ elif (test == 'prop'):
     print('\nEndpoint frames')
     # [[ 0.          0.        ]
     #  [ 0.         -1.04719755]
-    #  [-0.78539816  1.57079633]]    
+    #  [-0.78539816  1.57079633]]
     print(robot.Qe)
 
-elif (test == 'rot'):
-    pass
+elif (test == 'state'):
 
-elif (test == 'pos'):
-    pass
+    print('\nSystem rotation matrices (transpose)')
+    # [[ 0.93629336  0.31299183 -0.15934508]
+    #  [-0.28962948  0.94470249  0.153792  ]
+    #  [ 0.19866933 -0.0978434   0.97517033]
+    #  [ 0.45726042  0.88932418 -0.00392662]
+    #  [-0.86685835  0.44668689  0.22142135]
+    #  [ 0.19866933 -0.0978434   0.97517033]
+    #  [ 0.01910228  0.84711447  0.53106702]
+    #  [-0.99821545  0.04621626 -0.03781495]
+    #  [-0.05657752 -0.52939695  0.84648559]
+    #  [-0.82964834  0.49658754  0.25511655]
+    #  [-0.55541212 -0.6878515  -0.46730899]
+    #  [-0.05657752 -0.52939695  0.84648559]
+    #  [-0.52209115  0.83150428  0.1897932 ]
+    #  [-0.82942832 -0.54683388  0.11411123]
+    #  [ 0.19866933 -0.0978434   0.97517033]]
+    AA = kin.calc_aa(A0, q, robot.BB, robot.j_type, robot.Qi)
+    print(AA.T)
 
-elif (test == 've'):
-    pass
+    print('\nSystem positions')
+    # [[1.         0.97925656 1.0745291  0.95581253 1.24863168]
+    #  [2.         2.21283306 2.56012078 2.88874326 2.43517878]
+    #  [3.         3.12812674 3.23355482 3.43114241 4.63374934]]
+    RR = kin.calc_pos(R0, AA, q, robot.BB, robot.j_type, robot.cc)
+    print(RR)
 
-elif (test == 'acc'):
-    pass
+    print('\nSystem linear velocities')
+    # [[ 1.3         1.42932966  1.58103017  1.75971121  2.35054698]
+    #  [-2.2        -2.15629294 -2.17146769 -2.07137279 -2.00205582]
+    #  [ 3.7         3.57028808  3.45168166  3.45005619  3.7811995 ]]
+    vv, ww = kin.calc_vel(AA, v0, w0, q, qd, robot.BB, robot.j_type, robot.cc)
+    print(vv)
+
+    print('\nSystem angular velocities')
+    # [[-0.2        -0.2        -0.2113155  -0.19434225 -0.2       ]
+    #  [ 0.5         0.5         0.39412061  0.5529397   0.5       ]
+    #  [-0.4        -0.4        -0.23070288 -0.48464856 -0.4       ]]
+    print(ww)
+
+elif (test == 'endpoint'):
+
+    print('\nLink sequence')
+    # body =  0 sequence =  []
+    # body =  1 sequence =  [1]
+    # body =  2 sequence =  [1, 2]
+    # body =  3 sequence =  [1, 2, 3]
+    # body =  4 sequence =  [1, 4]    
+    # all with shape shape (num_links_in_sequence, )
+    for i in range(robot.num_b):
+        seq_link = kin.j_num(i, robot.BB)
+        print('body = ', i, 'sequence = ', seq_link)
+
+    print('\nPosition joints in link sequence')
+    # [[0.84507452 1.07070864 1.08025978]
+    #  [2.00028635 2.39069789 2.81425512]
+    #  [3.03159136 3.12734141 3.39287493]]    
+    seq_link = kin.j_num(3, robot.BB)
+    POS_jnt, ORI_jnt = kin.f_kin_j(robot.RR, robot.AA, q, seq_link,
+                                   robot.j_type, robot.cc)
+    print(POS_jnt)
+
+    print('\nOrientation joints in link sequence (transpose)')
+    # [[ 0.45726042  0.88932418 -0.00392662]
+    #  [-0.86685835  0.44668689  0.22142135]
+    #  [ 0.19866933 -0.0978434   0.97517033]
+    #  [ 0.01910228  0.84711447  0.53106702]
+    #  [-0.99821545  0.04621626 -0.03781495]
+    #  [-0.05657752 -0.52939695  0.84648559]
+    #  [-0.82964834  0.49658754  0.25511655]
+    #  [-0.55541212 -0.6878515  -0.46730899]
+    #  [-0.05657752 -0.52939695  0.84648559]]    
+    print(ORI_jnt.T)
+
+    print('\nPosition/orientation endpoint in link sequence')
+    # ie =  0 body =  3
+    # [0.62343504 2.85707237 3.97979727], shape (3, )
+    # [[-0.19391429 -0.97938564 -0.05657752]
+    #  [ 0.83752487 -0.13524404 -0.52939695]
+    #  [ 0.510832   -0.15004271  0.84648559]]
+    # ie =  1 body =  4
+    # [1.36898733 2.46206103 5.63738865], shape (3, )
+    # [[-0.82942832  0.08899289  0.55147886]
+    #  [-0.54683388 -0.33101728 -0.76902553]
+    #  [ 0.11411123 -0.93941888  0.32321943]]    
+    for ie in range(robot.num_e):
+        seq_link = kin.j_num(robot.SE[ie], robot.BB)
+        POS_e, ORI_e = kin.f_kin_e(robot.RR, robot.AA, seq_link, robot.Qe[:, ie],
+                                robot.ce[:, ie])
+        print('ie = ', ie, 'body = ', robot.SE[ie])
+        print(POS_e)
+        print(ORI_e)
 
 elif (test == 'utils'):
 
@@ -210,8 +293,8 @@ elif (test == 'utils'):
     yaw = pi/4
     V1 = np.array([1.1, 2.2, 3.3])
     V2 = np.array([0.7, -0.2, -2.4])
-    M1 = np.tile(V1.reshape(3,1), (1, 5))
-    M2 = np.tile(V2.reshape(3,1), (1, 5))
+    M1 = np.tile(V1.reshape(3, 1), (1, 5))
+    M2 = np.tile(V2.reshape(3, 1), (1, 5))
     w = np.array([0.4, -0.7, 0.3])
     dt = 0.2
     print('roll= ', roll)
@@ -242,14 +325,14 @@ elif (test == 'utils'):
     print('\nRotation about Z')
     # [[ 0.8660254  0.5        0.       ]
     #  [-0.5        0.8660254  0.       ]
-    #  [ 0.         0.         1.       ]]    
+    #  [ 0.         0.         1.       ]]
     Rz = utils.rotZ(roll)
     print(Rz)
 
     print('\nRotation matrix from RPY angles')
     # [[ 0.35355339  0.91855865 -0.1767767 ]
     #  [-0.35355339  0.30618622  0.88388348]
-    #  [ 0.8660254  -0.25        0.4330127 ]]  
+    #  [ 0.8660254  -0.25        0.4330127 ]]
     R = utils.rpy2dc(np.array([roll, pitch, yaw]))
     print(R)
 
@@ -297,7 +380,7 @@ elif (test == 'utils'):
     print('\nCross product (two matrices)')
     # [[-4.62 -4.62 -4.62 -4.62 -4.62]
     #  [ 4.95  4.95  4.95  4.95  4.95]
-    #  [-1.76 -1.76 -1.76 -1.76 -1.76]]    
+    #  [-1.76 -1.76 -1.76 -1.76 -1.76]]
     M12 = utils.cross(M1, M2)
     print(M12)
 

@@ -31,8 +31,9 @@ def j_num(num_link, BB):
 
 def f_kin_e(RR, AA, seq_link, Qe, ce):
     """
-    Returns position and orientation of the endpoint associated with sequence
-     <seq_link>.
+    Returns position and orientation (with respect to the inertial frame) of
+    the endpoint with values <Qe> and <ce> and attached to the link specified
+    by <seq_link>.
      """
     # Link number
     i = seq_link[-1]
@@ -49,11 +50,17 @@ def f_kin_e(RR, AA, seq_link, Qe, ce):
     return POS_e, ORI_e
 
 
-def f_kin_j(RR, AA, q, seq_link, j_type, cc, Ez):
+def f_kin_j(RR, AA, q, seq_link, j_type, cc):
     """
-    Returns position and orientation of all joints in sequence <seq_link>.
+    Returns position and orientation (with respect to the inertial frame) of
+    all joints in the link sequence specified by <seq_link>.
+
+    ORI_jnt = [AA_1, AA_2, ... ]         (3, 3*n_link)
+    POS_jnt = [Pj_1, Pj_2, ... ]         (3, n_link)
+
     """
-    n_links = len(seq_link)
+    n_links = len(seq_link)             # Number of links in the sequence
+    Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
     POS_jnt = np.zeros((3, n_links))
     ORI_jnt = np.zeros((3, 3*n_links))
 
@@ -152,7 +159,7 @@ def calc_je(RR, AA, q, seq_link, j_type, cc, ce, Qe, Ez, ie):
     # Assemble the endpoint Jacobian - Shape is (6 x n_links)
     JJ = np.block([[JJ_te],
                    [JJ_re]])
-    
+
     # Assemble the endpoint Jacobian in the global Jacobian of shape (6 x num_j)
     for i in range(n_links):
         j = seq_link[i]                 # Joint/link number in the sequence
@@ -163,11 +170,17 @@ def calc_je(RR, AA, q, seq_link, j_type, cc, ce, Qe, Ez, ie):
 
 def calc_aa(A0, q, BB, j_type, Qi):
     """
-    Returns the rotation matrices of all bodies (centroid and joint frames are
-    always parallel).
+    Returns the rotation matrices of all bodies with respect to the inertial
+    frame.
+
+    AA = [AA_1, AA_2, ... ]         (3, 3*num_b)
+
+    Note: for the links the centroid frame and the corresponding joint frame
+          are always parallel.
     """
-    num_j = len(q)                  # Number of joints/links
-    num_b = num_j + 1               # Number of bodies
+    num_j = len(q)                      # Number of joints/links
+    num_b = num_j + 1                   # Number of bodies
+    Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
     AA = np.zeros((3, 3*num_b))
 
     # Base
@@ -177,29 +190,33 @@ def calc_aa(A0, q, BB, j_type, Qi):
     for i in range(1, num_b):
 
         idxi = i - 1             # Index link/joint <i> in BB, j_type, Qi
-        k = BB[idxi]                    # Previous link/joint
-        A_I_k = AA[:, 3*k:3*(k+1)]      # Rotation matrix previous link
+        k = BB[idxi]                    # Index lower link connection
+        A_I_k = AA[:, 3*k:3*(k+1)]      # Rotation matrix lower link connection
 
-        # Rotational joint (is this correct if Ez not z axis?????)
+        # Rotational joint
         if (j_type[idxi] == 'R'):
-            A_rel = rpy2dc(Qi[0, idxi], Qi[1, idxi], Qi[2, idxi] + q[idxi]).T
+            A_rel = rpy2dc(Qi[:, idxi] + Ez * q[idxi]).T
 
         # Prismatic joint
         elif (j_type[idxi] == 'P'):
             A_rel = rpy2dc(Qi[:, idxi]).T
 
         # Update rotation matrix (integral of eqs. 3.8 and 3.12)
-        AA[:, 3*i:3*(i+1)] = A_I_k @ A_rel      # A_I_i
+        AA[:, 3*i:3*(i+1)] = A_I_k @ A_rel
 
     return AA
 
 
-def calc_pos(R0, AA, q, BB, j_type, cc, Ez):
+def calc_pos(R0, AA, q, BB, j_type, cc):
     """
-    Returns the position of all body centroids (figure 3.5)
+    Returns the position of all body centroids with respect to the inertial
+    frame (figure 3.5).
+
+    RR = [RR_1, RR_2, ... ]         (3, num_b)
     """
-    num_j = len(q)              # Number of joints/links
-    num_b = num_j + 1           # Number of bodies
+    num_j = len(q)                      # Number of joints/links
+    num_b = num_j + 1                   # Number of bodies
+    Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
     RR = np.zeros((3, num_b))
 
     # Base
@@ -209,7 +226,7 @@ def calc_pos(R0, AA, q, BB, j_type, cc, Ez):
     for i in range(1, num_b):
 
         idxi = i - 1             # Index link/joint <i> in BB, j_type, q
-        k = BB[idxi]             # Connected previous link/joint
+        k = BB[idxi]             # Index lower link connection
 
         # Rotation matrices
         A_I_i = AA[:, 3*i:3*(i+1)]
@@ -222,18 +239,23 @@ def calc_pos(R0, AA, q, BB, j_type, cc, Ez):
         # Prismatic joint (integral of eq. 3.13)
         elif (j_type[idxi] == 'P'):
             RR[:, i] = RR[:, k] + A_I_k @ cc[:, k, i] \
-                                - A_I_i @ (Ez * q[idxi] - cc[:, i, i])
+                                + A_I_i @ (Ez * q[idxi] - cc[:, i, i])
 
     return RR
 
 
-def calc_vel(AA, v0, w0, q, qd, BB, j_type, cc, Ez):
+def calc_vel(AA, v0, w0, q, qd, BB, j_type, cc):
     """
-    Returns the linear velocity of each body centroids and the angular
-    velocity of each body (eqs. 3.8-3.9 and 3.12-3.13, figure 3.5).
+    Returns the linear velocity of all body centroids and the angular velocity
+    of all body (eqs. 3.8-3.9 and 3.12-3.13, figure 3.5).
+
+    vv = [vv_1, vv_2, ... ]         (3, num_b)
+    ww = [ww_1, ww_2, ... ]         (3, num_b)
+
     """
-    num_j = len(q)                  # Number of joints/links
-    num_b = num_j + 1               # Number of bodies
+    num_j = len(q)                      # Number of joints/links
+    num_b = num_j + 1                   # Number of bodies
+    Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
     vv = np.zeros((3, num_b))
     ww = np.zeros((3, num_b))
 
@@ -245,7 +267,7 @@ def calc_vel(AA, v0, w0, q, qd, BB, j_type, cc, Ez):
     for i in range(1, num_b):
 
         idxi = i - 1             # Index link/joint <i> in BB, j_type, q, qd
-        k = BB[idxi]             # Connected previous link/joint
+        k = BB[idxi]             # Index lower link connection
 
         # Rotation matrices
         A_I_i = AA[:, 3*i:3*(i+1)]
@@ -418,7 +440,7 @@ def calc_hh(RR, AA, mass, inertia, BB, j_type, cc, Ez):
     HH_wq = np.zeros((3, num_j))            # Eq. 3.22
     HH_q = np.zeros((num_j, num_j))         # Eq. 3.23
     JJ_tg = np.zeros((3, num_j))            # Eq. 3.24
-    
+
     # Loop over all links
     for i in range(1, num_j+1):
 
@@ -445,7 +467,7 @@ def calc_hh(RR, AA, mass, inertia, BB, j_type, cc, Ez):
                 + mass[i] * JJ_t[:, id1:id2].T @ JJ_t[:, id1:id2]
 
         # Eq. 3.24 - shape (3 x num_j)
-        JJ_tg += mass[i] * JJ_t[:, id1:id2]      #!!!!!! divided by total mass???
+        JJ_tg += mass[i] * JJ_t[:, id1:id2]      # divided by total mass???
 
     # Matrix HH_b (eq. 3.19) - shape (6 x 6)
     wE = mass.sum() * np.eye(3)

@@ -27,15 +27,15 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - calc_ang_mom1 (new - system angular momentum 1st derivative)
 
 - File *kinematics.py*:
-  - j_num (link sequence to an end-point)
-  - f_kin_e (position and orientation of an end-point)
-  - f_kin_j (position and orientation of all joints in a link sequence)
+  - j_num (link sequence to an end-point, tested)
+  - f_kin_e (position and orientation of an end-point, tested)
+  - f_kin_j (position and orientation of all joints in a link sequence, tested)
   - calc_jte (translational Jacobian of an end-point)
   - calc_jre (rotational Jacobian of an end-point)
   - calc_je (Jacobian of an end-point)
-  - calc_aa (link rotation matrices)
-  - calc_pos (link centroid positions)
-  - calc_vel (link centroid velocities)
+  - calc_aa (link rotation matrices, tested)
+  - calc_pos (link centroid positions, tested)
+  - calc_vel (link centroid velocities, tested)
   - calc_acc (link centroid accelerations)
   - calc_jt (translational jacobian wrt link centroids)
   - calc_jr (rotational jacobian wrt link centroids)
@@ -47,6 +47,9 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - f_dyn_nb2 (integration using Newmark-beta method)
   - f_dyn_rk2 (integration using Runge-Kutta)
   - f_dyn (forward dynamics)
+
+- File *user.py*:
+  - calc_Forces (new - user-defined external forces)
 
 - File *utils.py*:
   - rotX (rotation about X axis, tested)
