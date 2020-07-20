@@ -125,6 +125,30 @@ if (test == 'Jac_endpoint'):
         print('ie = ', ie, ', body = ', robot.SE[ie])
         print(Jacobian)
 
+elif(test == 'acceleration'):
+
+    print('\nData:')
+    vd0 = np.array([-1.7, 2.4, -4.5])
+    wd0 = np.array([0.3, -0.2, 0.13])
+    qdd = np.array([0.1, -0.3, 0.6, -1.1])
+    print('vd0 = ', vd0)
+    print('wd0 = ', wd0)
+    print('qdd = ', qdd)
+
+    print('\nLinear acceleration')
+    # [[-1.7        -1.82564463 -1.89752749 -1.86707295 -2.02768068]
+    #  [ 2.4         2.25985011  2.16232466  1.99136753  1.67073172]
+    #  [-4.5        -4.40821138 -4.34017092 -4.37590531 -5.88368248]]
+    vd, wd = kin.calc_acc(robot.AA, robot.ww, vd0, wd0, q, qd, qdd, robot.BB,
+                          robot.j_type, robot.cc)
+    print(vd)
+
+    print('\nAngular acceleration')
+    # [[ 0.3         0.3         0.35927006  0.26187834  0.3       ]
+    #  [-0.2        -0.2        -0.00279529 -0.3780119  -0.2       ]
+    #  [ 0.13        0.13       -0.09711205  0.37052886  0.13      ]]
+    print(wd)
+
 elif (test == 'connectivity'):
     
     print('\nBodies upper connection(s) matrix')

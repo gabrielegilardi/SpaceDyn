@@ -129,7 +129,7 @@ def calc_aa(A0, q, BB, j_type, Qi):
     Returns the rotation matrices of all bodies with respect to the inertial
     frame.
 
-    AA = [AA_1, AA_2, ... ]         (3, 3*num_b)
+    AA = [AA_0, AA_1, ... ]         (3, 3*num_b)
 
     Note: for the links the centroid frame and the corresponding joint frame
           are always parallel.
@@ -142,12 +142,12 @@ def calc_aa(A0, q, BB, j_type, Qi):
     # Base
     AA[:, 0:3] = A0
 
-    # Links
+    # i = current link, k = lower link connection
     for i in range(1, num_b):
 
-        idxi = i - 1             # Index link/joint <i> in BB, j_type, Qi
-        k = BB[idxi]                    # Index lower link connection
-        A_I_k = AA[:, 3*k:3*(k+1)]      # Rotation matrix lower link connection
+        idxi = i - 1                # Index link/joint <i> in BB, j_type, Qi
+        k = BB[idxi]                # Index lower link connection
+        A_I_k = AA[:, 3*k:3*(k+1)]
 
         # Rotational joint
         if (j_type[idxi] == 'R'):
@@ -168,7 +168,7 @@ def calc_pos(R0, AA, q, BB, j_type, cc):
     Returns the position of all body centroids with respect to the inertial
     frame (figure 3.5).
 
-    RR = [RR_1, RR_2, ... ]         (3, num_b)
+    RR = [RR_0, RR_1, ... ]         (3, num_b)
     """
     num_j = len(q)                      # Number of joints/links
     num_b = num_j + 1                   # Number of bodies
@@ -178,7 +178,7 @@ def calc_pos(R0, AA, q, BB, j_type, cc):
     # Base
     RR[:, 0] = R0
 
-    # Links
+    # i = current link, k = lower link connection
     for i in range(1, num_b):
 
         idxi = i - 1             # Index link/joint <i> in BB, j_type, q
@@ -205,9 +205,8 @@ def calc_vel(AA, v0, w0, q, qd, BB, j_type, cc):
     Returns the linear velocity of all body centroids and the angular velocity
     of all body (eqs. 3.8-3.9 and 3.12-3.13, figure 3.5).
 
-    vv = [vv_1, vv_2, ... ]         (3, num_b)
-    ww = [ww_1, ww_2, ... ]         (3, num_b)
-
+    vv = [vv_0, vv_1, ... ]         (3, num_b)
+    ww = [ww_0, ww_1, ... ]         (3, num_b)
     """
     num_j = len(q)                      # Number of joints/links
     num_b = num_j + 1                   # Number of bodies
@@ -219,7 +218,7 @@ def calc_vel(AA, v0, w0, q, qd, BB, j_type, cc):
     vv[:, 0] = v0
     ww[:, 0] = w0
 
-    # Links
+    # i = current link, k = lower link connection
     for i in range(1, num_b):
 
         idxi = i - 1             # Index link/joint <i> in BB, j_type, q, qd
@@ -254,13 +253,17 @@ def calc_vel(AA, v0, w0, q, qd, BB, j_type, cc):
     return vv, ww
 
 
-def calc_acc(AA, ww, vd0, wd0, q, qd, qdd, BB, j_type, cc, Ez):
+def calc_acc(AA, ww, vd0, wd0, q, qd, qdd, BB, j_type, cc):
     """
-    Returns the linear acceleration of each body centroids and the angular
-    acceleration of each body (eqs. 3.10-3.11 and 3.14-3.15, figure 3.5).
+    Returns the linear acceleration of all body centroids and the angular
+    acceleration of all body (eqs. 3.10-3.11 and 3.14-3.15, figure 3.5).
+
+    vd = [vd_0, vd_1, ... ]         (3, num_b)
+    wd = [wd_0, wd_1, ... ]         (3, num_b)
     """
-    num_j = len(q)              # Number of joints/links
-    num_b = num_j + 1           # Number of bodies
+    num_j = len(q)                      # Number of joints/links
+    num_b = num_j + 1                   # Number of bodies
+    Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
     vd = np.zeros((3, num_b))
     wd = np.zeros((3, num_b))
 
@@ -268,11 +271,11 @@ def calc_acc(AA, ww, vd0, wd0, q, qd, qdd, BB, j_type, cc, Ez):
     vd[:, 0] = vd0
     wd[:, 0] = wd0
 
-    # i = current link, k = previous link
+    # i = current link, k = lower link connection
     for i in range(1, num_b):
 
         idxi = i - 1        # Index link/joint <i> in BB, j_type, q, qd, qdd
-        k = BB[idxi]        # Connected previous link/joint
+        k = BB[idxi]        # Index lower link connection
 
         # Rotation matrices
         A_I_i = AA[:, 3*i:3*(i+1)]
