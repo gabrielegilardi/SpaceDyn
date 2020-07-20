@@ -200,7 +200,7 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce, BB,
 
             # Jacobian associated to this endpoint - shape is (6 x num_j)
             JJ_tmp = calc_je(RR, AA, q, seq_link, j_type, cc, ce[:, ie],
-                             Qe[:, ie], Ez)
+                             Qe[:, ie])
             JJ_tx_i = JJ_tmp[0:3, :]        # Translational component
             JJ_rx_i = JJ_tmp[3:6, :]        # Rotational component
 

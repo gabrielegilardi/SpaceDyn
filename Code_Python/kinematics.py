@@ -55,9 +55,8 @@ def f_kin_j(RR, AA, q, seq_link, j_type, cc):
     Returns position and orientation (with respect to the inertial frame) of
     all joints in the link sequence specified by <seq_link>.
 
-    ORI_jnt = [AA_1, AA_2, ... ]         (3, 3*n_link)
     POS_jnt = [Pj_1, Pj_2, ... ]         (3, n_link)
-
+    ORI_jnt = [AA_1, AA_2, ... ]         (3, 3*n_link)
     """
     n_links = len(seq_link)             # Number of links in the sequence
     Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
@@ -85,85 +84,42 @@ def f_kin_j(RR, AA, q, seq_link, j_type, cc):
     return POS_jnt, ORI_jnt
 
 
-def calc_jte(RR, AA, q, seq_link, j_type, cc, ce, Qe, Ez):
+def calc_je(RR, AA, q, seq_link, j_type, cc, ce, Qe):
     """
-    Returns the translational Jacobian (3 x n_links) of the endpoint associated
-    with sequence <seq_link> (equation 3.25).
+    Returns the Jacobian (6 x num_j) of the endpoint associated with sequence
+    <seq_link> (eqs 3.25 and 3.26).
     """
-    n_links = len(seq_link)
-    JJ_te = np.zeros((3, n_links))
+    num_j = len(q)
+    n_links = len(seq_link)             # Number of links in the sequence
+    Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
+    Jacobian = np.zeros((6, num_j))
 
     # Position and orientation for all joints in the sequence
-    POS_jnt, ORI_jnt = f_kin_j(RR, AA, q, seq_link, j_type, cc, Ez)
+    POS_jnt, ORI_jnt = f_kin_j(RR, AA, q, seq_link, j_type, cc)
 
-    # Position and orientation for the end-point
+    # Position and orientation for the endpoint
     POS_e, ORI_e = f_kin_e(RR, AA, seq_link, Qe, ce)
 
     # Loop over the sequence
     for i in range(n_links):
 
-        j = seq_link[i]                 # Joint/link number in the sequence
-        Ez_I_j = AA[:, 3*j:3*(j+1)] * Ez
+        j = seq_link[i]             # Joint/link number in the sequence
+        idxj = j - 1                # Index link/joint <j> in j_type
+        Ez_I_j = AA[:, 3*j:3*(j+1)] @ Ez
 
         # Rotational joint
-        if (j_type[i] == 'R'):
-            JJ_te[:, i] = cross(Ez_I_j, POS_e - POS_jnt[:, i])
+        if (j_type[idxj] == 'R'):
+            JJ_te = cross(Ez_I_j, POS_e - POS_jnt[:, i])
+            JJ_re = Ez_I_j
 
-        # Prismatic joint
-        elif (j_type[i] == 'P'):
-            JJ_te[:, i] = Ez_I_j
+        # Prismatic joint (rotational component already set to zero)
+        elif (j_type[idxj] == 'P'):
+            JJ_te = Ez_I_j
+            JJ_re = np.zeros(3)
 
-    return JJ_te
-
-
-def calc_jre(AA, seq_link, j_type, Ez):
-    """
-    Returns the rotational Jacobian (3 x n_links) of the endpoint associated
-    with sequence <seq_link> (equation 3.26).
-    """
-    n_links = len(seq_link)
-    JJ_re = np.zeros((3, n_links))
-
-    # Loop over the sequence
-    for i in range(n_links):
-
-        j = seq_link[i]                 # Joint/link number in the sequence
-        Ez_I_j = AA[:, 3*j:3*(j+1)] * Ez
-
-        # Rotational joint
-        if (j_type[i] == 'R'):
-            JJ_re[:, i] = Ez_I_j
-
-        # Prismatic joint
-        elif (j_type[i] == 'P'):
-            pass                        # Already set to zero
-
-    return JJ_re
-
-
-def calc_je(RR, AA, q, seq_link, j_type, cc, ce, Qe, Ez, ie):
-    """
-    Returns the Jacobian (6 x num_j) of the endpoint associated with sequence
-    <seq_link> (equations 3.25 and 3.26).
-    """
-    n_links = len(seq_link)
-    num_j = len(q)
-    Jacobian = np.zeros((6, num_j))
-
-    # Translational Jacobian (eq. 3.25) - Shape is (3 x n_links)
-    JJ_te = calc_jte(RR, AA, q, seq_link, j_type, cc, ce, Qe, Ez)
-
-    # Rotational Jacobian (eq. 3.26) - Shape is (3 x n_links)
-    JJ_re = calc_jre(AA, seq_link, j_type, Ez)
-
-    # Assemble the endpoint Jacobian - Shape is (6 x n_links)
-    JJ = np.block([[JJ_te],
-                   [JJ_re]])
-
-    # Assemble the endpoint Jacobian in the global Jacobian of shape (6 x num_j)
-    for i in range(n_links):
-        j = seq_link[i]                 # Joint/link number in the sequence
-        Jacobian[:, j-1] = JJ[:, i]
+    # Assemble the endpoint Jacobian in the global Jacobian
+        Jacobian[0:3, j-1] = JJ_te
+        Jacobian[3:6, j-1] = JJ_re
 
     return Jacobian
 

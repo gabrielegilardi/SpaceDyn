@@ -101,8 +101,32 @@ if len(sys.argv) != 2:
     sys.exit(1)
 test = sys.argv[1]
 
-if (test == 'connectivity'):
+if (test == 'Jac_endpoint'):
 
+    print('\nJacobian due to the end point')
+    # ie =  0 body =  3
+    # [[ 0.19866933 -0.84606681 -0.34695908  0.        ]
+    #  [-0.0978434  -0.33038082 -0.35348895  0.        ]
+    #  [ 0.97517033 -0.26317159 -0.24426412  0.        ]
+    #  [ 0.         -0.05657752 -0.05657752  0.        ]
+    #  [ 0.         -0.52939695 -0.52939695  0.        ]
+    #  [ 0.          0.84648559  0.84648559  0.        ]]
+    # ie =  1 body =  4
+    # [[ 0.19866933  0.          0.          0.19866933]
+    #  [-0.0978434   0.          0.         -0.0978434 ]
+    #  [ 0.97517033  0.          0.          0.97517033]
+    #  [ 0.          0.          0.          0.        ]
+    #  [ 0.          0.          0.          0.        ]
+    #  [ 0.          0.          0.          0.        ]]
+    for ie in range(0, robot.num_e):
+        seq_link = kin.j_num(robot.SE[ie], robot.BB)
+        Jacobian = kin.calc_je(robot.RR, robot.AA, q, seq_link, robot.j_type,
+                               robot.cc, robot.ce[:, ie], robot.Qe[:, ie])
+        print('ie = ', ie, ', body = ', robot.SE[ie])
+        print(Jacobian)
+
+elif (test == 'connectivity'):
+    
     print('\nBodies upper connection(s) matrix')
     # [[-1  1  0  0  0]
     #  [ 0 -1  1  0  1]
@@ -243,7 +267,7 @@ elif (test == 'endpoint'):
     # all with shape shape (num_links_in_sequence, )
     for i in range(robot.num_b):
         seq_link = kin.j_num(i, robot.BB)
-        print('body = ', i, 'sequence = ', seq_link)
+        print('body = ', i, ', sequence = ', seq_link)
 
     print('\nPosition joints in link sequence')
     # [[0.84507452 1.07070864 1.08025978]
@@ -281,7 +305,7 @@ elif (test == 'endpoint'):
         seq_link = kin.j_num(robot.SE[ie], robot.BB)
         POS_e, ORI_e = kin.f_kin_e(robot.RR, robot.AA, seq_link, robot.Qe[:, ie],
                                 robot.ce[:, ie])
-        print('ie = ', ie, 'body = ', robot.SE[ie])
+        print('ie = ', ie, ', body = ', robot.SE[ie])
         print(POS_e)
         print(ORI_e)
 
