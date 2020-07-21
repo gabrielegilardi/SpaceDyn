@@ -296,15 +296,14 @@ class model:
 
         # # Forward dynamics
         # # vd0, wd0, self.qdd = kin.f_dyn()
-        # vd0 = np.array([1.0, 2.0, 3.0])
-        # wd0 = np.array([0.1, 0.2, 0.3])
-        # self.qdd = np.array([0.1, 0.5, 1.0, 1.5])
+        # vd0 = np.array([-1.7, 2.4, -4.5])
+        # wd0 = np.array([0.3, -0.2, 0.13])
+        # self.qdd = np.array([0.1, -0.3, 0.6, -1.1])
 
-        # # Centroid accelerations (linear and angular)
+        # Centroid accelerations (linear and angular)
         # self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
         #                                 self.qd, self.qdd, self.BB, self.j_type,
         #                                 self.cc)
-        # return
 
     def calc_CoM(self):
         """
@@ -314,9 +313,10 @@ class model:
         m = diag(self.mass)
         m_tot = m.sum()
 
-        RR_com = (self.RR @ m).sum() / m_tot
-        vv_com = (self.vv @ m).sum() / m_tot
-        vd_com = (self.vd @ m).sum() / m_tot
+        # Sum along axis 1?????
+        RR_com = (self.RR @ m).sum(axis=1) / m_tot
+        vv_com = (self.vv @ m).sum(axis=1) / m_tot
+        vd_com = (self.vd @ m).sum(axis=1) / m_tot
 
         return RR_com, vv_com, vd_com
 

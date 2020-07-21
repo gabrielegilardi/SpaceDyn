@@ -35,9 +35,8 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - calc_pos (link centroid positions, tested)
   - calc_vel (link centroid velocities, tested)
   - calc_acc (link centroid accelerations, tested)
-  - calc_jt (translational jacobian wrt link centroids)
-  - calc_jr (rotational jacobian wrt link centroids)
-  - calc_hh (system inertia matrix)
+  - calc_Jac (translatonial/rotational jacobian wrt link centroids, tested)
+  - calc_hh (system inertia matrix, tested)
 
 - File *dynamics.py*:
   - calc_Forces (new - user-defined external forces)

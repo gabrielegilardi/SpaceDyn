@@ -55,8 +55,8 @@ def f_kin_j(RR, AA, q, seq_link, j_type, cc):
     Returns position and orientation (with respect to the inertial frame) of
     all joints in the link sequence specified by <seq_link>.
 
-    POS_jnt = [Pj_1, Pj_2, ... ]         (3, n_link)
-    ORI_jnt = [AA_1, AA_2, ... ]         (3, 3*n_link)
+    POS_jnt = [Pj_0, Pj_1, ... ]         (3, n_link)
+    ORI_jnt = [AA_0, AA_1, ... ]         (3, 3*n_link)
     """
     n_links = len(seq_link)             # Number of links in the sequence
     Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
@@ -117,7 +117,7 @@ def calc_je(RR, AA, q, seq_link, j_type, cc, ce, Qe):
             JJ_te = Ez_I_j
             JJ_re = np.zeros(3)
 
-    # Assemble the endpoint Jacobian in the global Jacobian
+        # Assemble the endpoint Jacobian in the global Jacobian
         Jacobian[0:3, j-1] = JJ_te
         Jacobian[3:6, j-1] = JJ_re
 
@@ -313,18 +313,20 @@ def calc_acc(AA, ww, vd0, wd0, q, qd, qdd, BB, j_type, cc):
     return vd, wd
 
 
-def calc_jt(RR, AA, BB, j_type, cc, Ez):
+def calc_Jac(RR, AA, BB, j_type, cc):
     """
-    Returns the translational Jacobians (3 x num_j x num_j) of all centroids
-    (equation 3.25).
+    Returns the translational Jacobians (3 x num_j x num_j) of all link
+    centroids (equation 3.25-3.26).
     """
     num_j = len(j_type)                     # Number of joints/links
+    Ez = np.array([0.0, 0.0, 1.0])          # Joint axis direction
     JJ_t = np.zeros((3, num_j*num_j))
+    JJ_r = np.zeros((3, num_j*num_j))
 
     # Loop over all links
     for i in range(1, num_j+1):
 
-        j = i               # Initial index from link/joint i to base
+        j = i       # Initial index from link/joint i to base (itself)
 
         # Follow the branch until the base (j = 0) is reached
         while(j > 0):
@@ -333,121 +335,87 @@ def calc_jt(RR, AA, BB, j_type, cc, Ez):
             A_I_j = AA[:, 3*j:3*(j+1)]
             Ez_I_j = A_I_j @ Ez
             cc_I_j = A_I_j @ cc[:, j, j]
+            col = (i-1)*num_j+(j-1)
 
             # Rotational joint
             if (j_type[idxj] == 'R'):
-                JJ_t[:, (i-1)*num_j+(j-1)] = \
+                JJ_t[:, col] = \
                     cross(Ez_I_j, RR[:, i] - (RR[:, j] + cc_I_j))
+                JJ_r[:, col] = Ez_I_j
 
             # Prismatic joint
             elif (j_type[idxj] == 'P'):
-                JJ_t[:, (i-1)*num_j+(j-1)] = Ez_I_j
+                JJ_t[:, col] = Ez_I_j
+                JJ_r[:, col] = np.zeros(3)
 
             j = BB[idxj]     # Previous link/joint along the branch
 
-    return JJ_t
+    return JJ_t, JJ_r
 
 
-def calc_jr(AA, BB, j_type, Ez):
-    """
-    Returns the rotational Jacobians (3 x num_j x num_j) of all centroids
-    (equation 3.26).
-    """
-    num_j = len(j_type)                     # Number of joints/links
-    JJ_r = np.zeros((3, num_j*num_j))
-
-    # Loop over all links
-    for i in range(1, num_j+1):
-
-        idxi = i - 1         # Index link/joint <i> in BB, j_type
-        A_I_i = AA[:, 3*i:3*(i+1)]
-        Ez_I_i = A_I_j @ Ez
-
-        # Rotational joint
-        if (j_type[idxi] == 'R'):
-            JJ_r[:, (i-1)*num_j+(i-1)] = Ez_I_i
-
-        # Prismatic joint
-        elif (j_type[idxi] == 'P'):
-            JJ_r[:, (i-1)*num_j+(i-1)] = np.zeros((3, 1))
-
-        j = BB[idxi]         # Previous link/joint along the branch
-
-        # Nothing chnages with <j> so just copy all previous in block
-        if (j > 0):
-            JJ_r[:, (i-1)*num_j:(i-1)*num_j+i-1] = \
-                JJ_r[:, (j-1)*num_j:(j-1)*num_j+i-1]
-
-    return JJ_r
-
-
-def calc_hh(RR, AA, mass, inertia, BB, j_type, cc, Ez):
+def calc_hh(RR, AA, mass, inertia, BB, j_type, cc):
     """
     Returns the system inertia matrix HH with shape (6 + num_j) x (6 + num_j)
     (equations 3.19-3.24).
+
+    Subscripts: b = base, q = joints, w = base orientation, r = base position
     """
     num_j = len(j_type)             # Number of joints/links
     num_b = num_j + 1               # Number of bodies
 
+    # System CoM with respect to the base (eq. 3.27)
+    mt = mass.sum()
+    Rg = (mass * RR[:, 0:num_b]).sum(axis=1) / mt
+    r0g = Rg - RR[:, 0]
+
     # Translational and rotational jacobian of all centroids - shape of each
     # is (3 x num_j x num_j)
-    JJ_t = calc_jt(RR, AA, BB, j_type, cc, Ez)          # Eq. 3.25
-    JJ_r = calc_jr(AA, BB, j_type, Ez)                  # Eq. 3.26
+    JJ_t, JJ_r = calc_Jac(RR, AA, BB, j_type, cc)       # Eq. 3.25-3.26
 
     # Initialize
-    HH_w = np.zeros((3, 3))                 # Eq. 3.21
-    HH_wq = np.zeros((3, num_j))            # Eq. 3.22
-    HH_q = np.zeros((num_j, num_j))         # Eq. 3.23
-    JJ_tg = np.zeros((3, num_j))            # Eq. 3.24
+    HH_ww = AA[:, 0:3] @ inertia[:, 0:3] @ AA[:, 0:3].T         # Eq. 3.21
+    HH_wq = np.zeros((3, num_j))                                # Eq. 3.22
+    HH_qq = np.zeros((num_j, num_j))                            # Eq. 3.23
+    HH_rq = np.zeros((3, num_j))                                # Eq. 3.24
 
-    # Loop over all links
+    # Assemble links
     for i in range(1, num_j+1):
 
         # Start/end index for link <i> in JJ_t and JJ_r
         id1 = (i - 1) * num_j
-        id2 = i*num_j
+        id2 = i * num_j
 
-        # Position link centroid <i> wrt the base (eq. 3.28)
+        # Position link centroid <i> wrt the base centroid (eq. 3.28)
         r0i = RR[:, i] - RR[:, 0]
 
-        # Rotation and inertia matrix
+        # Link rotation and inertia matrix
         A_I_i = AA[:, 3*i:3*(i+1)]
         In_I_i = A_I_i @ inertia[:, 3*i:3*(i+1)] @ A_I_i.T
 
         # Eq. 3.21 - shape (3 x 3)
-        HH_w += In_I_i + mass[i] * tilde(r0i).T @ tilde(r0i)
+        HH_ww += In_I_i + mass[i] * tilde(r0i).T @ tilde(r0i)
 
         # Eq. 3.22 - shape (3 x num_j)
         HH_wq += In_I_i @ JJ_r[:, id1:id2] \
                  + mass[i] * tilde(r0i) @ JJ_t[:, id1:id2]
 
         # Eq. 3.23 - shape (num_j x num_j)
-        HH_q += JJ_r[:, id1:id2].T @ In_I_i.T @ JJ_r[:, id1:id2] \
+        HH_qq += JJ_r[:, id1:id2].T @ In_I_i @ JJ_r[:, id1:id2] \
                 + mass[i] * JJ_t[:, id1:id2].T @ JJ_t[:, id1:id2]
 
         # Eq. 3.24 - shape (3 x num_j)
-        JJ_tg += mass[i] * JJ_t[:, id1:id2]      # divided by total mass???
+        HH_rq += mass[i] * JJ_t[:, id1:id2]
 
-    # Matrix HH_b (eq. 3.19) - shape (6 x 6)
-    wE = mass.sum() * np.eye(3)
-
-    Rg = mass * RR[:, 0:num_b] / mass.sum()
-    wr0g = mass * (Rg - RR[:, 0])
-
-    HH_w += AA[:, 0:3] @ inertia[:, 0:3] @ AA[:, 0:3].T
-
-    HH_b = np.block([[wE,          tilde(wr0g).T],
-                     [tilde(wr0g), HH_w         ]])
+    # Matrix HH_bb (eq. 3.19) - shape (6 x 6)
+    HH_bb = np.block([[mt * np.eye(3),  mt * tilde(r0g).T],
+                      [mt * tilde(r0g), HH_ww            ]])
 
     # Matrix HH_bm (eq. 3.20) - shape (6 x num_j)
-    HH_bm = np.block([[JJ_tg],
-                      [HH_q ]])
-
-    # Matrix HH_m (eq. 3.23) - shape (num_j x num_j)
-    HH_m = HH_q
+    HH_bq = np.block([[HH_rq],
+                      [HH_wq]])
 
     # Matrix HH (eq. 3.18) - shape (6+num_j x 6+num_j)
-    HH = np.block([[HH_b,    HH_bm],
-                   [HH_bm.T, HH_m ]])
+    HH = np.block([[HH_bb,   HH_bq],
+                   [HH_bq.T, HH_qq ]])
 
     return HH
