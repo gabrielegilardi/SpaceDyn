@@ -35,14 +35,14 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - calc_pos (link centroid positions, tested)
   - calc_vel (link centroid velocities, tested)
   - calc_acc (link centroid accelerations, tested)
-  - calc_Jac (translatonial/rotational jacobian wrt link centroids, tested)
+  - calc_jac (translatonial/rotational jacobian wrt link centroids, tested)
   - calc_hh (system inertia matrix, tested)
 
 - File *dynamics.py*:
-  - calc_Forces (new - user-defined external forces)
-  - r_ne (inverse dynamics by recursive Newton-Euler method)
-  - f_dyn_nb2 (integration using Newmark-beta method)
-  - f_dyn_rk2 (integration using Runge-Kutta)
+  - calc_forces (new - user-defined external forces, tested)
+  - r_ne (inverse dynamics by recursive Newton-Euler method, tested)
+  - f_dyn_nb (time-integration using the Newmark-beta implicit method)
+  - f_dyn_rk (time-integration using the Runge-Kutta explicit method)
   - f_dyn (forward dynamics)
 
 - File *user.py*:

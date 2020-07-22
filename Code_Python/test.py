@@ -14,7 +14,9 @@ import numpy as np
 
 import elements as element
 import kinematics as kin
+import dynamics as dyn
 import utils as utils
+import user as user
 
 pi = np.pi
 d2r = 180.0 / pi
@@ -76,11 +78,14 @@ cc = {4: [-0.23, 0.0, 0.0]}      # Leg connection
 lowerArm = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
                         Qi=Qi, cc=cc)
 
-name = 'simple robot'
+# Endpoints
 ee = {
       0: (3, [0.4, -0.05, 0.5], [0.0,  0.0, -pi/4]),
       1: (4, [0.15, 0.0,  1.0], [0.0, -pi/3, pi/2]),
      }
+
+# System
+name = 'simple robot'
 bodies = [foot, leg, trunk, upperArm, lowerArm]
 robot = element.model(name=name, bodies=bodies, ee=ee)
 
@@ -124,6 +129,45 @@ if (test == 'Jac_endpoint'):
                                robot.cc, robot.ce[:, ie], robot.Qe[:, ie])
         print('ie = ', ie, ', body = ', robot.SE[ie])
         print(Jacobian)
+
+elif(test == 'rne'):
+
+    print('\nData:')
+    vd0 = np.array([-1.7, 2.4, -4.5])
+    wd0 = np.array([0.3, -0.2, 0.13])
+    qdd = np.array([0.1, -0.3, 0.6, -1.1])
+    print('vd0 = ', vd0)
+    print('wd0 = ', wd0)
+    print('qdd = ', qdd)
+
+    print('\nExternal forces')
+    # [[-10.3  -12.36]
+    #  [ 11.4   13.68]
+    #  [ 20.4   24.48]]
+    Fe, Te = user.calc_forces(robot.num_e)
+    print(Fe)
+
+    print('\nExternal moments')
+    # [[ 2.2  -1.54]
+    #  [-4.4   3.08]
+    #  [ 1.6  -1.12]]
+    print(Te)
+
+    # <Force> has shape (6+num_j, )
+    print('\nRNE result F0')
+    Force = dyn.r_ne(robot.RR, robot.AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te,
+                     robot.SS, robot.SE, robot.j_type, robot.cc, robot.ce,
+                     robot.mass, robot.inertia, robot.BB)
+    # [ 12.07580754 -12.51535814 -14.9985643 ]
+    print(Force[0:3])
+
+    print('\nRNE result T0')
+    # [ 24.47189078  39.44989961 -11.31933556]
+    print(Force[3:6])
+
+    print('\nRNE result tau')
+    # [-21.82565933  -2.32047012   1.56963594 -17.20710116]
+    print(Force[6:])
 
 elif(test == 'matrix_HH'):
 

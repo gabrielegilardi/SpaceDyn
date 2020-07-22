@@ -15,14 +15,35 @@ import kinematics as kin
 from utils import cross, rotW
 
 
-def calc_Forces(num_j=0):
+def calc_forces(num_e):
     """
-    Returns the external forces/moments/torques applied to base, links, and
-    joints.
-    """
-    num_b = num_j + 1
-    Fe = np.zeros((3, num_b))           # Forces on base and link end-points
-    Te = np.zeros((3, num_b))           # Moments on base and link end-points
-    tau = np.zeros(num_j)               # Torques/forces on joints
+    Returns any external force/moment applied on the bodies.
 
-    return Fe, Te, tau
+    Fe = [Fe_0, Fe_1, ... ]         (3, num_e)
+    Te = [Te_0, Te_1, ... ]         (3, num_e)
+
+    If the endpoints are defined by:
+
+    ee = {
+      0: (link_id, position, orientation),
+      1: (link_id, position, orientation),
+      .....
+      num_e: (link_id, position, orientation)
+         }
+
+    then Fe_0 and Te_0 are applied to the endpoint with index 0, Fe_1 and Te_1
+    are applied to the endpoint with index 1, etc., up to endpoint with index
+    num_e 
+    """
+    Fe = np.zeros((3, num_e))           # Forces on the bodies
+    Te = np.zeros((3, num_e))           # Moments on the bodies
+
+    # Endpoint index 0
+    Fe[:, 0] = np.array([-10.3, 11.4, 20.4])
+    Te[:, 0] = np.array([2.2, -4.4, 1.6])
+
+    # Endpoint index 0
+    Fe[:, 1] = 1.2 * np.array([-10.3, 11.4, 20.4])
+    Te[:, 1] = -0.7 * np.array([2.2, -4.4, 1.6])
+
+    return Fe, Te

@@ -14,6 +14,7 @@ import numpy as np
 import kinematics as kin
 import dynamics as dyn
 from utils import cross, rpy2dc
+import user as user
 
 
 def connectivity(bodies, ee):
@@ -292,13 +293,17 @@ class model:
                                         self.BB, self.j_type, self.cc)
 
         # # External forces
-        # self.Fe, self.Te, self.tau = dyn.calc_Forces(self.num_j)
+        # self.Fe, self.Te = user.calc_forces(self.num_j)
 
         # # Forward dynamics
-        # # vd0, wd0, self.qdd = kin.f_dyn()
         # vd0 = np.array([-1.7, 2.4, -4.5])
         # wd0 = np.array([0.3, -0.2, 0.13])
-        # self.qdd = np.array([0.1, -0.3, 0.6, -1.1])
+        # qdd = np.array([0.1, -0.3, 0.6, -1.1])
+        # Force = dyn.r_ne(self.RR, self.AA, v0, w0, vd0, wd0, q, qd, qdd, self.Fe, self.Te,
+        #                 self.SS, self.SE, self.j_type, self.cc, self.ce,
+        #                 self.mass, self.inertia, self.BB)
+
+        # # vd0, wd0, self.qdd = kin.f_dyn()
 
         # Centroid accelerations (linear and angular)
         # self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,

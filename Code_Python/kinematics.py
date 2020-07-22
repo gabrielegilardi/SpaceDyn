@@ -313,7 +313,7 @@ def calc_acc(AA, ww, vd0, wd0, q, qd, qdd, BB, j_type, cc):
     return vd, wd
 
 
-def calc_Jac(RR, AA, BB, j_type, cc):
+def calc_jac(RR, AA, BB, j_type, cc):
     """
     Returns the translational Jacobians (3 x num_j x num_j) of all link
     centroids (equation 3.25-3.26).
@@ -370,7 +370,7 @@ def calc_hh(RR, AA, mass, inertia, BB, j_type, cc):
 
     # Translational and rotational jacobian of all centroids - shape of each
     # is (3 x num_j x num_j)
-    JJ_t, JJ_r = calc_Jac(RR, AA, BB, j_type, cc)       # Eq. 3.25-3.26
+    JJ_t, JJ_r = calc_jac(RR, AA, BB, j_type, cc)       # Eq. 3.25-3.26
 
     # Initialize
     HH_ww = AA[:, 0:3] @ inertia[:, 0:3] @ AA[:, 0:3].T         # Eq. 3.21

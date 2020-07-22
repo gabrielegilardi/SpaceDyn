@@ -16,77 +16,89 @@ from utils import cross, rotW
 
 
 def r_ne(RR, AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te, SS, SE, j_type, cc, ce,
-         mass, inertia, Ez, Gravity, BB):
+         mass, inertia, BB):
     """
     Inverse dynamics computation by the recursive Newton-Euler method
     (eqs. 3.30-3.39).
 
-    FF, TT          Inertial forces and moments on the centroids
+    Given:
+    FF, TT          Inertial forces and moments on the body centroids
     Fj, Tj          Forces and moments on the joints
     Fe, Te          Forces and moments on the endpoints
+    vd0, wd0        Base linear and angular acceleration
+    qdd             Joint linear/angular acceleration
+    state           System state (RR, AA, v0, w0, q, qd)
 
+    Returns:
     F0, T0          Reaction force and moment of the base
     tau             Torques/forces on the revolute/prismatic joints
 
-    !!!! check signs !!!!!
-
+    i.e. returns the forces and moments on the base and the torques/forces
+    on the joints needed to dynamically balance the system.
     """
     num_j = len(q)              # Number of joints/links
     num_b = num_j + 1           # Number of bodies
     num_e = len(SE)             # Number of endpoints
+    Ez = np.array([0.0, 0.0, 1.0])              # Joint axis direction
+    Gravity = np.array([0.0, 0.0, -9.81])       # Gravity vector
 
-    # Linear and angular velocities (all bodies)
-    vv, ww = kin.calc_vel(AA, v0, w0, q, qd, BB, j_type, cc, Ez)
+    # Linear and angular velocities of all bodies
+    vv, ww = kin.calc_vel(AA, v0, w0, q, qd, BB, j_type, cc)
 
-    # Linear and angular accelerations (all bodies)
-    vd, wd = kin.calc_acc(AA, ww, vd0, wd0, q, qd, qdd, BB, j_type, cc, Ez)
+    # Linear and angular accelerations of all bodies
+    vd, wd = kin.calc_acc(AA, ww, vd0, wd0, q, qd, qdd, BB, j_type, cc)
 
-    # Inertial forces and moments on the centroids, including the gravitational
-    # force (eqs. 3.30-3.31) - base is included
-    FF = np.zeros((3, num_b))
-    TT = np.zeros((3, num_b))
+    # Inertial forces and moments on the body centroids, (for convenience the
+    # the gravitational force is also included here) - eqs. 3.30-3.31
+    F_in = np.zeros((3, num_b))
+    T_in = np.zeros((3, num_b))
     for i in range(num_b):
 
         A_I_i = AA[:, 3*i:3*(i+1)]
         In_I_i = A_I_i @ inertia[:, 3*i:3*(i+1)] @ A_I_i.T
 
         # Eq. 3.30 and 3.31
-        FF[:, i] = mass[i] * (vd[:, i] - Gravity)
-        TT[:, i] = In_I_i @ wd[:, i] + cross(ww[:, i], (In_I_i @ ww[:, i]))
+        F_in[:, i] = mass[i] * (vd[:, i] - Gravity)
+        T_in[:, i] = In_I_i @ wd[:, i] + cross(ww[:, i], (In_I_i @ ww[:, i]))
 
     # Forces and moments on the joints (eqs. 3.32-3.35)
-    Fj = np.zeros((3, num_j))
-    Tj = np.zeros((3, num_j))
+    F_jnt = np.zeros((3, num_j))
+    T_jnt = np.zeros((3, num_j))
 
     # Start from the last link
     for i in range(num_j, 0, -1):
 
         idxi = i - 1            # Index joint <i> in Fjnt, Tjnt, j_type, q
         A_I_i = AA[:, 3*i:3*(i+1)]
-        is_P = float(j_type[idxi] == 'P')       # Joint <i> is prismatic
+        is_P = float(j_type[idxi] == 'P')       # = 1 if joint is prismatic
 
         # Vector centroid <i> to joint <i>
         L_ii = cc[:, i, i] - is_P * Ez * q[idxi]
 
-        # Add inertial force and moment (!!!! why moment is negative !!!!)
-        Fj[:, idxi] = FF[:, i]
-        Tj[:, idxi] = TT[:, i] - cross((A_I_i @ L_ii), FF[:, i])
+        # Add inertial force and moment on the link centroid (the cross-product
+        # is negative because the arm should go from the joint to the centroid)
+        F_jnt[:, idxi] = F_in[:, i]
+        T_jnt[:, idxi] = T_in[:, i] - cross(A_I_i @ L_ii, F_in[:, i])
 
-        # Add connected links force and moments (may be more than one)
+        # Add force and moment due to connected upper links (note that a link
+        # may have more than one upper connection)
         for j in range(i+1, num_j+1):
-            
-            idxj = j - 1        # Index joint <j> in j_type, q, Fjnt, Tjnt
 
-            # Add contribution if link <j> is connected to link <i>
+            idxj = j - 1        # Index joint <j> in j_type, q, F_jnt, T_jnt
+
+            # Add contribution if link <j> is an upper connection of link <i>
             if (SS[i, j]):
 
                 # Vector joint <i> to joint <j>
-                L_ij = cc[:, i, j] - cc[:, i, i] + is_P * Ez * q[idxj]
+                L_ij = cc[:, i, j] - cc[:, i, i] + is_P * Ez * q[idxi]
 
-                # Add joint force and moment
-                Fj[:, idxi] += Fj[:, idxj]
-                Tj[:, idxi] += cross(A_I_i @ L_ij, Fj[:, idxj]) + Tj[:, idxj]
-        
+                # Add joint force and moment (note that Fj and Tj are calculated
+                # as joint force and moment on the j-th link, thus the force and
+                # moment passed to the i-th link are equal and opposite)
+                F_jnt[:, idxi] += F_jnt[:, idxj]
+                T_jnt[:, idxi] += cross(A_I_i @ L_ij, F_jnt[:, idxj]) \
+                                  + T_jnt[:, idxj]
+
         # Add external forces and moments
         for ie in range(num_e):
 
@@ -96,34 +108,35 @@ def r_ne(RR, AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te, SS, SE, j_type, cc, ce,
                 # Vector centroid <i> to endpoint <ie>
                 L_ie = ce[:, ie] - cc[:, i, i] + is_P * Ez * q[idxi]
 
-                # Add external force and moment (!!!!! check sign both !!!!)
-                Fj[:, idxi] += - Fe[:, ie]
-                Tj[:, idxi] += - cross(A_I_i @ L_ie, Fe[:, ie]) - Te[:, ie]
+                # Add external force and moment
+                F_jnt[:, idxi] -= Fe[:, ie]
+                T_jnt[:, idxi] -= (cross(A_I_i @ L_ie, Fe[:, ie]) + Te[:, ie])
 
     # Reaction force and moment on the base centroid (Eqs. 3.38 and 3.39)
-    FF0 = np.zeros(3)
-    TT0 = np.zeros(3)
+    F0 = np.zeros(3)
+    T0 = np.zeros(3)
 
     # Add inertial force and moment of the base
-    FF0 += FF[:, 0]
-    TT0 += TT[:, 0]
-    
+    F0 += F_in[:, 0]
+    T0 += T_in[:, 0]
+
     # Add forces and moments from the links connected to the base
     for i in range(1, num_j+1):
 
         # Add if link <i> is connected
         if (SS[0, i] > 0):
             idxi = i - 1             # Index link/joint <i> in Fjnt, Tjnt
-            FF0 += Fj[:, idxi]
-            TT0 += cross(AA[:, 0:3] @ cc[:, 0, i], Fj[:, idxi]) + Tj[:, idxi]
+            F0 += F_jnt[:, idxi]
+            T0 += cross(AA[:, 0:3] @ cc[:, 0, i], F_jnt[:, idxi]) \
+                  + T_jnt[:, idxi]
 
-    # Add external forces and moments !!! check signs !!!!!
+    # Add external forces and moments
     for ie in range(num_e):
 
         # Add contribution if endpoint <ie> is connected to the base
         if (SE[ie] == 0):
-            FF0 += - Fe[:, ie]
-            TT0 += - cross(AA[:, 0:3] @ ce[:, ie], Fe[:, ie]) - Te[:, ie]
+            F0 -= Fe[:, ie]
+            T0 -= (cross(AA[:, 0:3] @ ce[:, ie], Fe[:, ie]) + Te[:, ie])
 
     # Calculation of joint torques/forces (eq. 3.36 and 3.37)
     tau = np.zeros(num_j)
@@ -134,20 +147,20 @@ def r_ne(RR, AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te, SS, SE, j_type, cc, ce,
 
         # If revolute joint (eq. 3.36)
         if (j_type[idxi] == 'R'):
-            tau[idxi] = Tj[:, idxi] @ Ez_I_i
+            tau[idxi] = T_jnt[:, idxi] @ Ez_I_i
 
         # If prismatic joint (eq. 3.37)
         elif (j_type[idxi] == 'P'):
-            tau[idxi] = Fj[:, idxi] @ Ez_I_i
+            tau[idxi] = F_jnt[:, idxi] @ Ez_I_i
 
-    # Compose generalized forces (return [FF0, TT0] if single-body)
-    Force = np.block([FF0, TT0, tau])
+    # Compose generalized forces
+    Force = np.block([F0, T0, tau])
 
     return Force
 
 
 def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce, BB,
-          j_type, Qi, cc, Ez, mass, inertia, Qe, SS):
+          j_type, Qi, cc, mass, inertia, Qe, SS):
     """
     Forward dynamics computation: returns the accelerations given the state
     (positions/orientations and velocities) and any external input.
@@ -170,8 +183,8 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce, BB,
     vd0 = np.zeros(3)
     wd0 = np.zeros(3)
     qdd = np.zeros(num_j)
-    Fe  = np.zeros((3, num_e))
-    Te  = np.zeros((3, num_e))
+    Fe = np.zeros((3, num_e))
+    Te = np.zeros((3, num_e))
     Force0 = r_ne(RR, AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te, SS, SE,
                   j_type, cc, ce, mass, inertia, Ez, Gravity, BB)
 
@@ -228,7 +241,7 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce, BB,
     Force_ee[6:] = taux
 
     # Calculation of the acceleration - eq. 3.29 ( !!!! check signs !!!!!)
-    acc = np.linalg.inv(HH) * (Force - Force0 + Force_ee)
+    acc = np.linalg.inv(HH) @ (Force - Force0 + Force_ee)
 
     vd0 = acc[0:3]
     wd0 = acc[3:6]
@@ -237,8 +250,8 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce, BB,
     return vd0, wd0, qdd
 
 
-def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
-              j_type, Qi, cc, Ez, mass, inertia, Qe, SS):
+def f_dyn_nb(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
+             j_type, Qi, cc, mass, inertia, Qe, SS):
     """
     Integration of the equations of motion using the Newmark-beta method and
     the Rodrigues formula to update the rotations.
@@ -274,7 +287,7 @@ def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
     # Predict w0 and A0
     wd0 = wd0_tmp
     wd0_pred = wd0
-    w0_pred = w0 + k4 *(wd0 + wd0_pred)
+    w0_pred = w0 + k4 * (wd0 + wd0_pred)
     A0_pred = rotW(w0_pred, dt) @ A0
 
     # 2nd step: correction
@@ -292,32 +305,32 @@ def f_dyn_nb2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
         R0_corr = R0 + k1 * v0 + k2 * Rdd0 + k3 * Rdd0_corr
         Rd0_corr = v0 + k4 * (Rdd0 + Rdd0_corr)
         v0_corr = Rd0_corr
-   
+
         # Correct q and qd
         qdd = qdd_tmp
         qdd_corr = qdd
         q_corr = q + k1 * qd + k2 * qdd + k3 * qdd_corr
         qd_corr = qd + k4 * (qdd + qdd_corr)
-   
+
         # Correct w0 and A0
         wd0 = wd0_tmp
         wd0_corr = wd0
-        w0_corr = w0 + k4 *(wd0 + wd0_corr)
+        w0_corr = w0 + k4 * (wd0 + wd0_corr)
         A0_corr = rotW(w0_corr, dt) @ A0
-   
+
         # Next step
         R0_pred = R0_corr
         A0_pred = A0_corr
         v0_pred = v0_corr
         w0_pred = w0_corr
-        q_pred  = q_corr
+        q_pred = q_corr
         qd_pred = qd_corr
 
-    return R0_pred, A0_pred, v0_pred, w0_pred, q_pred, qd_pred 
+    return R0_pred, A0_pred, v0_pred, w0_pred, q_pred, qd_pred
 
 
-def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
-              j_type, Qi, cc, Ez, mass, inertia, Qe, SS):
+def f_dyn_rk(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
+             j_type, Qi, cc, mass, inertia, Qe, SS):
     """
     Integration of the equations of motion using the Runge-Kutta method and
     the Rodrigues formula to update the rotations.
@@ -329,7 +342,7 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
 
     k1_R0 = v0 * dt
     k1_A0 = rotW(w0, dt) @ A0 - A0
-    k1_q  = qd * dt
+    k1_q = qd * dt
     k1_v0 = vd0_tmp * dt
     k1_w0 = wd0_tmp * dt
     k1_qd = qdd_tmp * dt
@@ -343,7 +356,7 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
 
     k2_R0 = (v0 + k1_v0 / 2.0) * dt
     k2_A0 = rotW(w0 + k1_w0 / 2.0, dt) @ A0 - A0
-    k2_q  = (qd + k1_qd / 2.0) * dt
+    k2_q = (qd + k1_qd / 2.0) * dt
     k2_v0 = vd0_tmp * dt
     k2_w0 = wd0_tmp * dt
     k2_qd = qdd_tmp * dt
@@ -357,7 +370,7 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
 
     k3_R0 = (v0 + k2_v0 / 2.0) * dt
     k3_A0 = rotW(w0 + k2_w0 / 2.0, dt) @ A0 - A0
-    k3_q  = (qd + k2_qd / 2.0) * dt
+    k3_q = (qd + k2_qd / 2.0) * dt
     k3_v0 = vd0_tmp * dt
     k3_w0 = wd0_tmp * dt
     k3_qd = qdd_tmp * dt
@@ -370,7 +383,7 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
 
     k4_R0 = (v0 + k3_v0) * dt
     k4_A0 = rotW(w0 + k3_w0, dt) @ A0 - A0
-    k4_q  = (qd + k3_qd) * dt
+    k4_q = (qd + k3_qd) * dt
     k4_v0 = vd0_tmp * dt
     k4_w0 = wd0_tmp * dt
     k4_qd = qdd_tmp * dt
@@ -378,11 +391,9 @@ def f_dyn_rk2(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
     # Compute Values at the Next Time Step
     R0_pred = R0 + (k1_R0 + 2.0 * k2_R0 + 2.0 * k3_R0 + k4_R0) / 6.0
     A0_pred = A0 + (k1_A0 + 2.0 * k2_A0 + 2.0 * k3_A0 + k4_A0) / 6.0
-    q_pred  = q  + (k1_q  + 2.0 * k2_q  + 2.0 * k3_q  + k4_q) / 6.0
+    q_pred = q + (k1_q + 2.0 * k2_q + 2.0 * k3_q + k4_q) / 6.0
     v0_pred = v0 + (k1_v0 + 2.0 * k2_v0 + 2.0 * k3_v0 + k4_v0) / 6.0
     w0_pred = w0 + (k1_w0 + 2.0 * k2_w0 + 2.0 * k3_w0 + k4_w0) / 6.0
     qd_pred = qd + (k1_qd + 2.0 * k2_qd + 2.0 * k3_qd + k4_qd) / 6.0
 
-    return R0_pred, A0_pred, v0_pred, w0_pred, q_pred, qd_pred 
-
-
+    return R0_pred, A0_pred, v0_pred, w0_pred, q_pred, qd_pred
