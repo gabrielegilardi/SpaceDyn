@@ -101,7 +101,7 @@ robot.set_init(R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
 
 # ------- Test ------- #
 
-if len(sys.argv) != 2:
+if (len(sys.argv) != 2):
     print("Usage: python test.py <block-to-test>")
     sys.exit(1)
 test = sys.argv[1]
@@ -130,7 +130,7 @@ if (test == 'Jac_endpoint'):
         print('ie = ', ie, ', body = ', robot.SE[ie])
         print(Jacobian)
 
-elif(test == 'rne'):
+elif (test == 'rne'):
 
     print('\nData:')
     vd0 = np.array([-1.7, 2.4, -4.5])
@@ -144,7 +144,7 @@ elif(test == 'rne'):
     # [[-10.3  -12.36]
     #  [ 11.4   13.68]
     #  [ 20.4   24.48]]
-    Fe, Te = user.calc_forces(robot.num_e)
+    F0, T0, tau, Fe, Te = user.calc_forces(robot.num_j, robot.num_e)
     print(Fe)
 
     print('\nExternal moments')
@@ -155,9 +155,9 @@ elif(test == 'rne'):
 
     # <Force> has shape (6+num_j, )
     print('\nRNE result F0')
-    Force = dyn.r_ne(robot.RR, robot.AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te,
-                     robot.SS, robot.SE, robot.j_type, robot.cc, robot.ce,
-                     robot.mass, robot.inertia, robot.BB)
+    Force = dyn.r_ne(robot.RR, robot.AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te,
+                     robot.SS, robot.SE, robot.BB, robot.j_type, robot.cc,
+                     robot.ce,robot.mass, robot.inertia)
     # [ 12.07580754 -12.51535814 -14.9985643 ]
     print(Force[0:3])
 
@@ -169,7 +169,46 @@ elif(test == 'rne'):
     # [-21.82565933  -2.32047012   1.56963594 -17.20710116]
     print(Force[6:])
 
-elif(test == 'matrix_HH'):
+elif (test == 'f_dyn'):
+
+    print('\nControl terms')
+    # F0 =  [-1.7  2.4 -4.5], shape (3, )
+    # T0 =  [ 0.3  -0.2   0.13], shape (3, )
+    # tau =  [ 0.1 -0.3  0.6 -1.1], shape (num_j, )
+    F0, T0, tau, Fe, Te = user.calc_forces(robot.num_j, robot.num_e)
+    print('F0 = ', F0)
+    print('T0 = ', T0)
+    print('tau = ', tau)
+
+    print('\nExternal forces')
+    # [[-10.3  -12.36]
+    #  [ 11.4   13.68]
+    #  [ 20.4   24.48]]
+    print(Fe)
+
+    print('\nExternal moments')
+    # [[ 2.2  -1.54]
+    #  [-4.4   3.08]
+    #  [ 1.6  -1.12]]
+    print(Te)
+
+    print('\nBase linear acceleration')
+    # [ -2.00047845   1.68790646 -11.44146866], shape (3, )
+    vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te,
+                              robot.SS, robot.SE, robot.BB, robot.j_type,
+                              robot.cc, robot.ce, robot.mass, robot.inertia,
+                              robot.Qi, robot.Qe)
+    print(vd0)
+
+    print('\nBase angular acceleration')
+    # [-7.80976388 -8.68344374  0.92761215], shape (3, )
+    print(wd0)
+
+    print('\nJoint angular/linear accelerations')
+    # [13.36313061   15.57472009 -109.54087316   16.22245975], shape (num_j, )
+    print(qdd)
+
+elif (test == 'matrix_HH'):
 
     print('\nMatrix HH shape')
     # (10, 10)
@@ -202,7 +241,7 @@ elif(test == 'matrix_HH'):
     #  [ 0.88        0.          0.          0.88      ]]
     print(HH[6:, 6:])
 
-elif(test == 'acceleration'):
+elif (test == 'acceleration'):
 
     print('\nData:')
     vd0 = np.array([-1.7, 2.4, -4.5])

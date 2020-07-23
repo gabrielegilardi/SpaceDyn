@@ -39,14 +39,13 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
   - calc_hh (system inertia matrix, tested)
 
 - File *dynamics.py*:
-  - calc_forces (new - user-defined external forces, tested)
   - r_ne (inverse dynamics by recursive Newton-Euler method, tested)
   - f_dyn_nb (time-integration using the Newmark-beta implicit method)
   - f_dyn_rk (time-integration using the Runge-Kutta explicit method)
-  - f_dyn (forward dynamics)
+  - f_dyn (forward dynamics, tested)
 
 - File *user.py*:
-  - calc_Forces (new - user-defined external forces)
+  - calc_forces (new - user-defined external/control forces, tested)
 
 - File *utils.py*:
   - rotX (rotation about X axis, tested)

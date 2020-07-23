@@ -293,15 +293,16 @@ class model:
                                         self.BB, self.j_type, self.cc)
 
         # # External forces
-        # self.Fe, self.Te = user.calc_forces(self.num_j)
+        # self.F0, self.T0, self.tau, self.Fe, self.Te = \
+        #               user.calc_forces(self.num_j, self.num_e)
 
         # # Forward dynamics
         # vd0 = np.array([-1.7, 2.4, -4.5])
         # wd0 = np.array([0.3, -0.2, 0.13])
         # qdd = np.array([0.1, -0.3, 0.6, -1.1])
-        # Force = dyn.r_ne(self.RR, self.AA, v0, w0, vd0, wd0, q, qd, qdd, self.Fe, self.Te,
-        #                 self.SS, self.SE, self.j_type, self.cc, self.ce,
-        #                 self.mass, self.inertia, self.BB)
+        # Force = dyn.r_ne(self.RR, self.AA, v0, w0, q, qd, vd0, wd0, qdd,
+        #                  self.Fe, self.Te, self.SS, self.SE, self.BB,
+        #                  self.j_type, self.cc, self.ce, self.mass, self.inertia)
 
         # # vd0, wd0, self.qdd = kin.f_dyn()
 

@@ -12,29 +12,24 @@ Python version of:
 import numpy as np
 
 import kinematics as kin
-from utils import cross, rotW
+from utils import cross, rotW, tilde
 
 
-def r_ne(RR, AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te, SS, SE, j_type, cc, ce,
-         mass, inertia, BB):
+def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
+         ce, mass, inertia):
     """
     Inverse dynamics computation by the recursive Newton-Euler method
     (eqs. 3.30-3.39).
 
     Given:
-    FF, TT          Inertial forces and moments on the body centroids
-    Fj, Tj          Forces and moments on the joints
-    Fe, Te          Forces and moments on the endpoints
-    vd0, wd0        Base linear and angular acceleration
-    qdd             Joint linear/angular acceleration
-    state           System state (RR, AA, v0, w0, q, qd)
+    state                               RR, AA, v0, w0, q, qd
+    accelerations                       vd0, wd0, qdd
+    external forces and moments         Fe, Te
 
     Returns:
-    F0, T0          Reaction force and moment of the base
-    tau             Torques/forces on the revolute/prismatic joints
+    internal forces and moments         F0, T0, tau
 
-    i.e. returns the forces and moments on the base and the torques/forces
-    on the joints needed to dynamically balance the system.
+    i.e. the system reaction forces and moments (base + joints).
     """
     num_j = len(q)              # Number of joints/links
     num_b = num_j + 1           # Number of bodies
@@ -159,61 +154,68 @@ def r_ne(RR, AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te, SS, SE, j_type, cc, ce,
     return Force
 
 
-def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce, BB,
-          j_type, Qi, cc, mass, inertia, Qe, SS):
+def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB, j_type, cc,
+          ce, mass, inertia, Qi, Qe):
     """
-    Forward dynamics computation: returns the accelerations given the state
-    (positions/orientations and velocities) and any external input.
+    Forward dynamics computation (chapter 3.6).
+
+    Given:
+    state                               R0, A0, v0, w0, q, qd
+    internal forces and moments         F0, T0, tau
+    external forces and moments         Fe, Te
+
+    Returns:
+    accelerations                       vd0, wd0, qdd
+    
+    i.e. the system linear and angular accelerations (base + joints).
     """
     num_j = len(q)              # Number of joints/links
     num_b = num_j + 1           # Number of bodies
-    num_e = len(SE)
+    num_e = len(SE)             # Number of endpoints
+    Ez = np.array([0.0, 0.0, 1.0])              # Joint axis direction
+    Gravity = np.array([0.0, 0.0, -9.81])       # Gravity vector
+    Force = np.zeros(6+num_j)
 
     # Rotation matrices
-    AA = calc_aa(A0, q, BB, j_type, Qi)
+    AA = kin.calc_aa(A0, q, BB, j_type, Qi)
 
     # Position vectors
-    RR = calc_pos(R0, AA, q, BB, j_type, cc, Ez)
+    RR = kin.calc_pos(R0, AA, q, BB, j_type, cc)
 
     # Inertia matrice
-    HH = calc_hh(RR, AA, mass, inertia, BB, j_type, cc, Ez)
+    HH = kin.calc_hh(RR, AA, mass, inertia, BB, j_type, cc)
 
-    # Calculation of velocty dependent term accomplished by recursive Newton
-    # Eulero inverse dynamics with accelerations and external forces set to 0.
-    vd0 = np.zeros(3)
-    wd0 = np.zeros(3)
-    qdd = np.zeros(num_j)
-    Fe = np.zeros((3, num_e))
-    Te = np.zeros((3, num_e))
-    Force0 = r_ne(RR, AA, v0, w0, vd0, wd0, q, qd, qdd, Fe, Te, SS, SE,
-                  j_type, cc, ce, mass, inertia, Ez, Gravity, BB)
+    # Calculation of velocty dependent terms using the recursive Newton-Eulero
+    # inverse dynamics setting to zero all the accelerations and all the
+    # external forces.
+    acc0 = np.zeros(3)
+    qdd0 = np.zeros(num_j)
+    Fe0 = np.zeros((3, num_e))
+    Force0 = r_ne(RR, AA, v0, w0, q, qd, acc0, acc0, qdd0, Fe0, Fe0, SS, SE,
+                  BB, j_type, cc, ce, mass, inertia)
 
-    # Forces on the generalized coordinate
-    Force = np.zeros(6+num_j)
-    Force[0:3] = F0
-    Force[3:6] = T0
-    if (num_j > 0):
-        Force[6:] = tau
+    # Generalized control terms on the base centroid and on the joints
+    Force = np.block([F0, T0, tau])
 
-    # Forces on the endpoints
+    # Generalized terms due to the force and moments applied to the endpoints
     Fx = np.zeros(3)
     Tx = np.zeros(3)
     taux = np.zeros(num_j)
 
-    # Loop over all endpoints !!!! check for base SE = 0 !!!!
+    # Loop over all endpoints
     for ie in range(num_e):
 
-        i = SE[ie]                      # Link associated to endpoint
+        i = SE[ie]          # Link associated to the endpoint <ie>
 
-        # Endpoint associated with a link
+        # If the endpoint is associated with a link
         if (i > 0):
 
-            # Link sequence to endpoint
-            seq_link = j_num(i, BB)
+            # Link sequence
+            seq_link = kin.j_num(i, BB)
 
-            # Jacobian associated to this endpoint - shape is (6 x num_j)
-            JJ_tmp = calc_je(RR, AA, q, seq_link, j_type, cc, ce[:, ie],
-                             Qe[:, ie])
+            # Endpoint Jacobian - shape is (6 x num_j)
+            JJ_tmp = kin.calc_je(RR, AA, q, seq_link, j_type, cc, ce[:, ie],
+                                 Qe[:, ie])
             JJ_tx_i = JJ_tmp[0:3, :]        # Translational component
             JJ_rx_i = JJ_tmp[3:6, :]        # Rotational component
 
@@ -221,27 +223,25 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, SE, ce, BB,
             A_I_i = AA[:, 3*i:3*(i+1)]
             R_0_ie = RR[:, i] - RR[:, 0] + A_I_i @ ce[:, ie]
 
-            # Generalized forces associated with this endpoint
+            # Generalized terms due to this endpoint
             Fx += Fe[:, ie]
             Tx += tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie]
             taux += JJ_tx_i.T @ Fe[:, ie] + JJ_rx_i.T @ Te[:, ie]
 
-        # Endpoint associated with the base
+        # If the endpoint is associated with the base
         else:
 
-            # Generalized forces associated with this endpoint
+            # Generalized terms due to this endpoint (no contribution to the
+            # joint terms)
             R_0_ie = AA[:, 0:3] @ ce[:, ie]
             Fx += Fe[:, ie]
             Tx += tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie]
 
-    # Copy values
-    Force_ee = zeros(num_e)
-    Force_ee[0:3] = Fx
-    Force_ee[3:6] = Tx
-    Force_ee[6:] = taux
+    # Assemble the endpoint contributions
+    Force_ee = np.block([Fx, Tx, taux])
 
-    # Calculation of the acceleration - eq. 3.29 ( !!!! check signs !!!!!)
-    acc = np.linalg.inv(HH) @ (Force - Force0 + Force_ee)
+    # Calculation of the acceleration - eq. 3.29
+    acc = np.linalg.inv(HH) @ (Force + Force_ee - Force0)
 
     vd0 = acc[0:3]
     wd0 = acc[3:6]
