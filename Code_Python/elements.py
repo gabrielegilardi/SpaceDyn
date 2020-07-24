@@ -258,10 +258,10 @@ class model:
 
         return
 
-    def set_init(self, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
+    def set_init(self, t0=0.0, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
                  w0=np.zeros(3), q=np.array([]), qd=np.array([])):
         """
-        Initializes quantities at starting time.
+        Initializes quantities at the starting time.
 
         Note: the zero refer to the base not to the time.
         """
@@ -292,37 +292,30 @@ class model:
         self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
                                         self.BB, self.j_type, self.cc)
 
-        # # External forces
-        # self.F0, self.T0, self.tau, self.Fe, self.Te = \
-        #               user.calc_forces(self.num_j, self.num_e)
+        # External forces and moments
+        F0, T0, tau, Fe, Te = user.calc_forces(t0, self.num_j, self.num_e)
 
-        # # Forward dynamics
-        # vd0 = np.array([-1.7, 2.4, -4.5])
-        # wd0 = np.array([0.3, -0.2, 0.13])
-        # qdd = np.array([0.1, -0.3, 0.6, -1.1])
-        # Force = dyn.r_ne(self.RR, self.AA, v0, w0, q, qd, vd0, wd0, qdd,
-        #                  self.Fe, self.Te, self.SS, self.SE, self.BB,
-        #                  self.j_type, self.cc, self.ce, self.mass, self.inertia)
-
-        # # vd0, wd0, self.qdd = kin.f_dyn()
+        # Forward dynamics
+        vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, self.q, self.qd, F0, T0,
+                                  tau, Fe, Te, self.SS, self.SE, self.BB,
+                                  self.j_type, self.cc, self.ce, self.mass,
+                                  self.inertia, self.Qi, self.Qe)
 
         # Centroid accelerations (linear and angular)
-        # self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
-        #                                 self.qd, self.qdd, self.BB, self.j_type,
-        #                                 self.cc)
+        self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
+                                        self.qd, qdd, self.BB, self.j_type,
+                                        self.cc)
 
     def calc_CoM(self):
         """
-        Returns position, velocity, and acceleration of the system center
-        of mass (CoM).
+        Returns position, velocity, and acceleration of the system center of
+        mass (CoM).
         """
-        m = diag(self.mass)
-        m_tot = m.sum()
+        mt = self.mass.sum()
 
-        # Sum along axis 1?????
-        RR_com = (self.RR @ m).sum(axis=1) / m_tot
-        vv_com = (self.vv @ m).sum(axis=1) / m_tot
-        vd_com = (self.vd @ m).sum(axis=1) / m_tot
+        RR_com = (self.RR * self.mass).sum(axis=1) / mt
+        vv_com = (self.vv * self.mass).sum(axis=1) / mt
+        vd_com = (self.vd * self.mass).sum(axis=1) / mt
 
         return RR_com, vv_com, vd_com
 
@@ -343,38 +336,32 @@ class model:
         """
         Returns the potential energy for the entire system and for each body.
         """
-        VG = - self.mass * (self.Gravity.T @ self.RR)
+        Gravity = np.array([0.0, 0.0, -9.81])       # Gravity vector
+
+        VG = - self.mass * (Gravity.T @ self.RR)
 
         return VG.sum(), VG
 
-    def calc_work(self):
+    def calc_work(self, time=0.0):
         """
-        Returns the work done by external forces/torques.
+        Returns the work done by all external forces and moments (total and
+        components - on the base, on the joints, on the endpoints).
         """
-        pass
+        # Evaluate external forces and moments
+        F0, T0, tau, Fe, Te = user.calc_forces(time, self.num_j, self.num_e)
 
-# function [ PF0, PFe, Ptau ] = calc_Work( v0, w0, vve, ww, qd, F0, T0, Fe, ...
-#                                     Te, tau )
+        # Work done by the control force/moment on the base
+        WK0 = (F0 * self.vv[:, 0] + T0 * self.ww[:, 0]).sum()
 
-#   num_q = length(qd);
-  
-#   %Work forces/moments on the base
-#   PF0 = F0'*v0 + T0'*w0;
-  
-#   %Work forces/moments on the end effector
-#   PFe = zeros(1,num_q);
-#   for i = 1:num_q
-#     PFe(1,i) = Fe(:,i)'*vve(:,i) + Te(:,i)'*ww(:,i);
-#   end
-  
-#   %Work forces/moments on the joints
-#   Ptau = zeros(1,num_q);
-#   for i = 1:num_q
-#     Ptau(1,i) = tau(i)*qd(i);
-#   end
+        # Work done by the control forces/torques on the joints
+        WKq = (tau * self.qd).sum()
 
-# end     % End of function
+        # Work done by the forces/moments on the endpoints
+        WKe = 0      # will be added later
 
+        WK = np.array([WK0, WKq, WKe])
+
+        return WK.sum(), WK
 
     def calc_lin_mom(self):
         """
@@ -403,7 +390,7 @@ class model:
             AA = self.AA[:, 3*i:3*(i+1)]
             In = AA @ self.inertia[:, 3*i:3*(i+1)] @ AA.T
             HM[:, i] = cross(self.RR[:, i] - P_ref,
-                       self.mass[i] * self.vv[:, i] + In @ self.ww[:, i])
+                       self.mass[i] * self.vv[:, i]) + In @ self.ww[:, i]
 
         return HM.sum(axis=1), HM
 
@@ -417,8 +404,8 @@ class model:
             AA = self.AA[:, 3*i:3*(i+1)]
             In = AA @ self.inertia[:, 3*i:3*(i+1)] @ AA.T
             HM[:, i] = In @ self.wd[:, i] \
-                       + cross(self.ww[:, i], In @ self.ww[:, i]) \
-                       + cross(self.RR[:, i] - P_ref, self.mass[i] * self.vd[:, i]) \
-                       + cross(self.vv[:, i] - V_ref, self.mass[i] * self.vv[:, i])
+                + cross(self.ww[:, i], In @ self.ww[:, i]) \
+                + cross(self.RR[:, i] - P_ref, self.mass[i] * self.vd[:, i]) \
+                + cross(self.vv[:, i] - V_ref, self.mass[i] * self.vv[:, i])
 
         return HM.sum(axis=1), HM

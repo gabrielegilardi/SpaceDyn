@@ -15,7 +15,7 @@ import kinematics as kin
 from utils import cross, rotW
 
 
-def calc_forces(num_j, num_e):
+def calc_forces(time=0.0, num_j=0, num_e=0):
     """
     Returns any external/control force/moment applied to the bodies.
 

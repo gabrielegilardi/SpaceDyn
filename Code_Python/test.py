@@ -90,6 +90,7 @@ bodies = [foot, leg, trunk, upperArm, lowerArm]
 robot = element.model(name=name, bodies=bodies, ee=ee)
 
 # Initial conditions
+t0 = 0.0
 R0 = np.array([1.0, 2.0, 3.0])
 Q0 = np.array([0.1, 0.2, 0.3])
 A0 = utils.rpy2dc(Q0).T
@@ -97,7 +98,7 @@ v0 = np.array([1.3, -2.2, 3.7])
 w0 = np.array([-0.2, 0.5, -0.4])
 q = np.array([0.1, 0.5, 1.0, 1.5])
 qd = np.array([-0.1, 0.2, -0.3, 0.4])
-robot.set_init(R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
+robot.set_init(t0=t0, R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
 
 # ------- Test ------- #
 
@@ -125,10 +126,98 @@ if (test == 'Jac_endpoint'):
     #  [ 0.          0.          0.          0.        ]]
     for ie in range(0, robot.num_e):
         seq_link = kin.j_num(robot.SE[ie], robot.BB)
-        Jacobian = kin.calc_je(robot.RR, robot.AA, q, seq_link, robot.j_type,
-                               robot.cc, robot.ce[:, ie], robot.Qe[:, ie])
+        Jacobian = kin.calc_je(robot.RR, robot.AA, robot.q, seq_link,
+                               robot.j_type, robot.cc, robot.ce[:, ie],
+                               robot.Qe[:, ie])
         print('ie = ', ie, ', body = ', robot.SE[ie])
         print(Jacobian)
+
+elif (test == 'extras'):
+
+    print('\nCoM (position, velocity, acceleration)')
+    # [1.04890281 2.32886718 3.36831239], shape (3, 1)
+    # [ 1.59487698 -2.1437259   3.61115562], shape (3, 1)
+    # [-4.20725389  4.74611399 -2.83590674], shape (3, 1)
+    RR_com, vv_com, vd_com = robot.calc_CoM()
+    print(RR_com)
+    print(vv_com)
+    print(vd_com)
+
+    print('\nKinetic energy (total, each body)')
+    # 59.39908062004454
+    # [24.28725  4.1819593  13.4930844  6.94516707 10.49161986], shape (num_b, )
+    TK_tot, TK = robot.calc_kin_ener()
+    print(TK_tot)
+    print(TK)
+
+    print('\nPotential energy (total, each body)')
+    # 59.39908062004454
+    # [24.28725  4.1819593  13.4930844  6.94516707 10.49161986], shape (num_b, )
+    VG_tot, VG = robot.calc_pot_ener()
+    print(VG_tot)
+    print(VG)
+
+    print('\nWork (total, each component)')
+    # -25.042
+    # [-24.352  -0.69    0.   ], shape (3, )
+    WK_tot, WK = robot.calc_work(t0)
+    print(WK_tot)
+    print(WK)
+
+    print('\nLinear momentum (total, each body)')
+    # [  9.23433771 -12.41217293  20.90859104], shape (3, 1)
+    # [[ 3.055       0.61461175  2.22925254  1.26699207  2.06848135]
+    #  [-5.17       -0.92720596 -3.06176944 -1.49138841 -1.76180912]
+    #  [ 8.695       1.53522387  4.86687115  2.48404046  3.32745556]]
+    LM_tot, LM = robot.calc_lin_mom()
+    print(LM_tot)
+    print(LM)
+
+    print('\nDerivative linear momentum (total, each body)')
+    # [-24.36    27.48   -16.4199], shape (3, 1)
+    # [[ -4.70112435  -0.3215798   -7.27618534  -2.85748541  -9.20362509]
+    #  [  3.96658018   0.54720907   3.176413     9.74576532  10.04403244]
+    #  [-26.88745134  -0.13668421  -3.35308209   0.24598072  13.71133692]]
+    LM1_tot, LM1 = robot.calc_lin_mom1()
+    print(LM1_tot)
+    print(LM1)
+
+    print('\nAngular momentum (total, each body)')
+    P_ref = np.array([-0.4, 3.3, 2.1])
+    # [ -5.44265512 -16.26732403 -10.32634658], shape (3, )
+    # [[-7.1205     -0.71794699 -0.14208894  0.96016958  1.57771123]
+    #  [-8.2485     -1.48003144 -4.62721414 -1.67854717 -0.23303128]
+    #  [-4.2065     -0.61494537 -2.87825568 -1.49946756 -1.12717797]]
+    HM_tot, HM = robot.calc_ang_mom(P_ref)
+    print(HM_tot)
+    print(HM)
+
+    print('\nDerivative angular momentum (total, each body)')
+    P_ref = np.array([-0.4, 3.3, 2.1])
+    V_ref = np.array([0.12, -1.3, 0.6])
+    # [-19.82552381 -44.75095764  12.19264768], shape (3, )
+    # [[ 21.23231946   0.93877478   2.88406675 -10.85006908 -34.03061573]
+    #  [ 12.21572716  -0.42307405  -5.00647375  -4.68163297 -46.85550403]
+    #  [ -1.72946084  -0.27238007  -2.43585302  10.51130336   6.11903825]]
+    HM1_tot, HM1 = robot.calc_ang_mom1(P_ref, V_ref)
+    print(HM1_tot)
+    print(HM1)
+
+    robot.calc_work(t0)
+
+elif (test == 'init'):
+
+    print('\nLinear acceleration')
+    # [[ -2.00047845  -0.74786001  -5.16041514  -3.96872974 -10.45866488]
+    #  [  1.68790646   1.27257922   2.25277517  13.53578516  11.41367323]
+    #  [-11.44146866  -0.31787025  -2.3780724    0.34163989  15.58106468]]
+    print(robot.vd)
+
+    print('\nAngular acceleration')
+    # [[ -7.80976388  -7.80976388  -8.64864615  -2.51454019  -7.80976388]
+    #  [ -8.68344374  -8.68344374 -16.8902675   41.04275865  -8.68344374]
+    #  [  0.92761215   0.92761215  14.13822187 -78.62679891   0.92761215]]
+    print(robot.wd)
 
 elif (test == 'rne'):
 
@@ -144,7 +233,7 @@ elif (test == 'rne'):
     # [[-10.3  -12.36]
     #  [ 11.4   13.68]
     #  [ 20.4   24.48]]
-    F0, T0, tau, Fe, Te = user.calc_forces(robot.num_j, robot.num_e)
+    F0, T0, tau, Fe, Te = user.calc_forces(t0, robot.num_j, robot.num_e)
     print(Fe)
 
     print('\nExternal moments')
@@ -155,9 +244,9 @@ elif (test == 'rne'):
 
     # <Force> has shape (6+num_j, )
     print('\nRNE result F0')
-    Force = dyn.r_ne(robot.RR, robot.AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te,
-                     robot.SS, robot.SE, robot.BB, robot.j_type, robot.cc,
-                     robot.ce,robot.mass, robot.inertia)
+    Force = dyn.r_ne(robot.RR, robot.AA, v0, w0, robot.q, robot.qd, vd0, wd0,
+                     qdd, Fe, Te, robot.SS, robot.SE, robot.BB, robot.j_type,
+                     robot.cc, robot.ce, robot.mass, robot.inertia)
     # [ 12.07580754 -12.51535814 -14.9985643 ]
     print(Force[0:3])
 
@@ -175,7 +264,7 @@ elif (test == 'integ_nb'):
     # F0 =  [-1.7  2.4 -4.5], shape (3, )
     # T0 =  [ 0.3  -0.2   0.13], shape (3, )
     # tau =  [ 0.1 -0.3  0.6 -1.1], shape (num_j, )
-    F0, T0, tau, Fe, Te = user.calc_forces(robot.num_j, robot.num_e)
+    F0, T0, tau, Fe, Te = user.calc_forces(t0, robot.num_j, robot.num_e)
     print('F0 = ', F0)
     print('T0 = ', T0)
     print('tau = ', tau)
@@ -199,9 +288,9 @@ elif (test == 'integ_nb'):
     #  [-0.13637442  0.09910793  0.98568739]]
     dt = 0.134
     R0_c, A0_c, v0_c, w0_c, q_c, qd_c = \
-        dyn.f_dyn_nb(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, robot.SS,
-                     robot.SE, robot.BB, robot.j_type, robot.cc, robot.ce,
-                     robot.mass, robot.inertia, robot.Qi, robot.Qe)
+        dyn.f_dyn_nb(dt, R0, A0, v0, w0, robot.q, robot.qd, F0, T0, tau, Fe,
+                     Te, robot.SS, robot.SE, robot.BB, robot.j_type, robot.cc,
+                     robot.ce, robot.mass, robot.inertia, robot.Qi, robot.Qe)
     print(R0_c)
     print(A0_c)
 
@@ -223,7 +312,7 @@ elif (test == 'integ_rk'):
     # F0 =  [-1.7  2.4 -4.5], shape (3, )
     # T0 =  [ 0.3  -0.2   0.13], shape (3, )
     # tau =  [ 0.1 -0.3  0.6 -1.1], shape (num_j, )
-    F0, T0, tau, Fe, Te = user.calc_forces(robot.num_j, robot.num_e)
+    F0, T0, tau, Fe, Te = user.calc_forces(t0, robot.num_j, robot.num_e)
     print('F0 = ', F0)
     print('T0 = ', T0)
     print('tau = ', tau)
@@ -247,9 +336,9 @@ elif (test == 'integ_rk'):
     #  [-0.17315116  0.07006564  0.98109985]]
     dt = 0.134
     R0_p, A0_p, v0_p, w0_p, q_p, qd_p = \
-        dyn.f_dyn_rk(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, robot.SS,
-                     robot.SE, robot.BB, robot.j_type, robot.cc, robot.ce,
-                     robot.mass, robot.inertia, robot.Qi, robot.Qe)
+        dyn.f_dyn_rk(dt, R0, A0, v0, w0, robot.q, robot.qd, F0, T0, tau, Fe,
+                     Te, robot.SS, robot.SE, robot.BB, robot.j_type, robot.cc,
+                     robot.ce, robot.mass, robot.inertia, robot.Qi, robot.Qe)
     print(R0_p)
     print(A0_p)
 
@@ -271,7 +360,7 @@ elif (test == 'f_dyn'):
     # F0 =  [-1.7  2.4 -4.5], shape (3, )
     # T0 =  [ 0.3  -0.2   0.13], shape (3, )
     # tau =  [ 0.1 -0.3  0.6 -1.1], shape (num_j, )
-    F0, T0, tau, Fe, Te = user.calc_forces(robot.num_j, robot.num_e)
+    F0, T0, tau, Fe, Te = user.calc_forces(t0, robot.num_j, robot.num_e)
     print('F0 = ', F0)
     print('T0 = ', T0)
     print('tau = ', tau)
@@ -290,10 +379,10 @@ elif (test == 'f_dyn'):
 
     print('\nBase linear acceleration')
     # [ -2.00047845   1.68790646 -11.44146866], shape (3, )
-    vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te,
-                              robot.SS, robot.SE, robot.BB, robot.j_type,
-                              robot.cc, robot.ce, robot.mass, robot.inertia,
-                              robot.Qi, robot.Qe)
+    vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, robot.q, robot.qd, F0, T0,
+                              tau, Fe, Te, robot.SS, robot.SE, robot.BB,
+                              robot.j_type, robot.cc, robot.ce, robot.mass,
+                              robot.inertia, robot.Qi, robot.Qe)
     print(vd0)
 
     print('\nBase angular acceleration')
@@ -351,8 +440,8 @@ elif (test == 'acceleration'):
     # [[-1.7        -1.82564463 -1.89752749 -1.86707295 -2.02768068]
     #  [ 2.4         2.25985011  2.16232466  1.99136753  1.67073172]
     #  [-4.5        -4.40821138 -4.34017092 -4.37590531 -5.88368248]]
-    vd, wd = kin.calc_acc(robot.AA, robot.ww, vd0, wd0, q, qd, qdd, robot.BB,
-                          robot.j_type, robot.cc)
+    vd, wd = kin.calc_acc(robot.AA, robot.ww, vd0, wd0, robot.q, robot.qd, qdd,
+                          robot.BB, robot.j_type, robot.cc)
     print(vd)
 
     print('\nAngular acceleration')
@@ -362,7 +451,7 @@ elif (test == 'acceleration'):
     print(wd)
 
 elif (test == 'connectivity'):
-    
+
     print('\nBodies upper connection(s) matrix')
     # [[-1  1  0  0  0]
     #  [ 0 -1  1  0  1]
@@ -483,7 +572,8 @@ elif (test == 'state'):
     # [[ 1.3         1.42932966  1.58103017  1.75971121  2.35054698]
     #  [-2.2        -2.15629294 -2.17146769 -2.07137279 -2.00205582]
     #  [ 3.7         3.57028808  3.45168166  3.45005619  3.7811995 ]]
-    vv, ww = kin.calc_vel(AA, v0, w0, q, qd, robot.BB, robot.j_type, robot.cc)
+    vv, ww = kin.calc_vel(AA, v0, w0, robot.q, robot.qd, robot.BB,
+                          robot.j_type, robot.cc)
     print(vv)
 
     print('\nSystem angular velocities')
@@ -499,7 +589,7 @@ elif (test == 'endpoint'):
     # body =  1 sequence =  [1]
     # body =  2 sequence =  [1, 2]
     # body =  3 sequence =  [1, 2, 3]
-    # body =  4 sequence =  [1, 4]    
+    # body =  4 sequence =  [1, 4]
     # all with shape shape (num_links_in_sequence, )
     for i in range(robot.num_b):
         seq_link = kin.j_num(i, robot.BB)
@@ -508,9 +598,9 @@ elif (test == 'endpoint'):
     print('\nPosition joints in link sequence')
     # [[0.84507452 1.07070864 1.08025978]
     #  [2.00028635 2.39069789 2.81425512]
-    #  [3.03159136 3.12734141 3.39287493]]    
+    #  [3.03159136 3.12734141 3.39287493]]
     seq_link = kin.j_num(3, robot.BB)
-    POS_jnt, ORI_jnt = kin.f_kin_j(robot.RR, robot.AA, q, seq_link,
+    POS_jnt, ORI_jnt = kin.f_kin_j(robot.RR, robot.AA, robot.q, seq_link,
                                    robot.j_type, robot.cc)
     print(POS_jnt)
 
@@ -523,7 +613,7 @@ elif (test == 'endpoint'):
     #  [-0.05657752 -0.52939695  0.84648559]
     #  [-0.82964834  0.49658754  0.25511655]
     #  [-0.55541212 -0.6878515  -0.46730899]
-    #  [-0.05657752 -0.52939695  0.84648559]]    
+    #  [-0.05657752 -0.52939695  0.84648559]]
     print(ORI_jnt.T)
 
     print('\nPosition/orientation endpoint in link sequence')
@@ -536,7 +626,7 @@ elif (test == 'endpoint'):
     # [1.36898733 2.46206103 5.63738865], shape (3, )
     # [[-0.82942832  0.08899289  0.55147886]
     #  [-0.54683388 -0.33101728 -0.76902553]
-    #  [ 0.11411123 -0.93941888  0.32321943]]    
+    #  [ 0.11411123 -0.93941888  0.32321943]]
     for ie in range(robot.num_e):
         seq_link = kin.j_num(robot.SE[ie], robot.BB)
         POS_e, ORI_e = kin.f_kin_e(robot.RR, robot.AA, seq_link, robot.Qe[:, ie],
