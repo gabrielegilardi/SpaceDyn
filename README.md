@@ -40,8 +40,8 @@ This is a Python version of the [original Matlab code](http://www.astro.mech.toh
 
 - File *dynamics.py*:
   - r_ne (inverse dynamics by recursive Newton-Euler method, tested)
-  - f_dyn_nb (time-integration using the Newmark-beta implicit method)
-  - f_dyn_rk (time-integration using the Runge-Kutta explicit method)
+  - f_dyn_nb (time-integration using the Newmark-beta implicit method, tested)
+  - f_dyn_rk (time-integration using the Runge-Kutta explicit method, tested)
   - f_dyn (forward dynamics, tested)
 
 - File *user.py*:

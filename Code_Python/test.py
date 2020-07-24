@@ -169,6 +169,102 @@ elif (test == 'rne'):
     # [-21.82565933  -2.32047012   1.56963594 -17.20710116]
     print(Force[6:])
 
+elif (test == 'integ_nb'):
+
+    print('\nControl terms')
+    # F0 =  [-1.7  2.4 -4.5], shape (3, )
+    # T0 =  [ 0.3  -0.2   0.13], shape (3, )
+    # tau =  [ 0.1 -0.3  0.6 -1.1], shape (num_j, )
+    F0, T0, tau, Fe, Te = user.calc_forces(robot.num_j, robot.num_e)
+    print('F0 = ', F0)
+    print('T0 = ', T0)
+    print('tau = ', tau)
+
+    print('\nExternal forces')
+    # [[-10.3  -12.36]
+    #  [ 11.4   13.68]
+    #  [ 20.4   24.48]]
+    print(Fe)
+
+    print('\nExternal moments')
+    # [[ 2.2  -1.54]
+    #  [-4.4   3.08]
+    #  [ 1.6  -1.12]]
+    print(Te)
+
+    print('\nBase position and orientation')
+    # [1.13771606 1.73577551 3.39216058], shape (3, )
+    # [[ 0.94908732 -0.27213271  0.15867277]
+    #  [ 0.28396351  0.95714231 -0.05695014]
+    #  [-0.13637442  0.09910793  0.98568739]]
+    dt = 0.134
+    R0_c, A0_c, v0_c, w0_c, q_c, qd_c = \
+        dyn.f_dyn_nb(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, robot.SS,
+                     robot.SE, robot.BB, robot.j_type, robot.cc, robot.ce,
+                     robot.mass, robot.inertia, robot.Qi, robot.Qe)
+    print(R0_c)
+    print(A0_c)
+
+    print('\nBase velocities')
+    # [ 0.7554636  -1.74364908  2.15314305], shape (3, )
+    # [-0.34320995 -0.29044906 -0.17588671], shape (3, )
+    print(v0_c)
+    print(w0_c)
+
+    print('\nJoint rotation/displacement and velocity')
+    # [ 0.19648832 -1.4213216  13.14994597  1.7322228 ], shape (num_j, )
+    # [  1.54012417 -28.87644185 181.64247722   3.06601193], shape (num_j, )
+    print(q_c)
+    print(qd_c)
+
+elif (test == 'integ_rk'):
+
+    print('\nControl terms')
+    # F0 =  [-1.7  2.4 -4.5], shape (3, )
+    # T0 =  [ 0.3  -0.2   0.13], shape (3, )
+    # tau =  [ 0.1 -0.3  0.6 -1.1], shape (num_j, )
+    F0, T0, tau, Fe, Te = user.calc_forces(robot.num_j, robot.num_e)
+    print('F0 = ', F0)
+    print('T0 = ', T0)
+    print('tau = ', tau)
+
+    print('\nExternal forces')
+    # [[-10.3  -12.36]
+    #  [ 11.4   13.68]
+    #  [ 20.4   24.48]]
+    print(Fe)
+
+    print('\nExternal moments')
+    # [[ 2.2  -1.54]
+    #  [-4.4   3.08]
+    #  [ 1.6  -1.12]]
+    print(Te)
+
+    print('\nBase position and orientation')
+    # [1.15306348 1.73660734 3.39464097], shape (3, )
+    # [[ 0.94973157 -0.24873044  0.18515775]
+    #  [ 0.2585669   0.96524871 -0.02369546]
+    #  [-0.17315116  0.07006564  0.98109985]]
+    dt = 0.134
+    R0_p, A0_p, v0_p, w0_p, q_p, qd_p = \
+        dyn.f_dyn_rk(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, robot.SS,
+                     robot.SE, robot.BB, robot.j_type, robot.cc, robot.ce,
+                     robot.mass, robot.inertia, robot.Qi, robot.Qe)
+    print(R0_p)
+    print(A0_p)
+
+    print('\nBase velocities')
+    # [ 0.78574832 -0.08986483  2.26171105], shape (3, )
+    # [-0.72124391 -0.58592202 -0.11343751], shape (3, )
+    print(v0_p)
+    print(w0_p)
+
+    print('\nJoint rotation/displacement and velocity')
+    # [0.21920791 0.42573765 1.98953271 1.68048456], shape (num_j, )
+    # [3.2762791  4.58397531 2.25539834 0.76729659], shape (num_j, )
+    print(q_p)
+    print(qd_p)
+
 elif (test == 'f_dyn'):
 
     print('\nControl terms')

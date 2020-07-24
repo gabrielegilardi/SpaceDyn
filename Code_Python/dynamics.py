@@ -166,7 +166,7 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB, j_type, cc,
 
     Returns:
     accelerations                       vd0, wd0, qdd
-    
+
     i.e. the system linear and angular accelerations (base + joints).
     """
     num_j = len(q)              # Number of joints/links
@@ -250,11 +250,28 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB, j_type, cc,
     return vd0, wd0, qdd
 
 
-def f_dyn_nb(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
-             j_type, Qi, cc, mass, inertia, Qe, SS):
+def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
+             j_type, cc, ce, mass, inertia, Qi, Qe):
     """
     Integration of the equations of motion using the Newmark-beta method and
     the Rodrigues formula to update the rotations.
+
+    Given:
+    time-step                           dt
+    state at time <t>                   R0, A0, v0, w0, q, qd, at <t>
+    internal forces and moments         F0, T0, tau
+    external forces and moments         Fe, Te
+
+    Returns:
+    state at time <t+dt>                R0, A0, v0, w0, q, qd, at <t+dt>
+
+    Notes:
+    - equations are written assuming gamma = 1/2 to guarantee the 2nd order
+      accuracy in the solution.
+    - beta = 0 corresponds to the central difference method.
+    - beta = 1/4 corresponds to the constant acceleration method.
+    - beta = 1/6 corresponds to the linear acceleration method.
+    - stability for any <dt> requires beta >= 1/4.
     """
     # Newmark parameters
     n_reps = 1
@@ -266,134 +283,157 @@ def f_dyn_nb(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
 
     # 1st step: prediction
 
-    # Get the acceleration terms for current state
-    vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te,
-                                      tau, SE, ce, BB, j_type, Qi, cc, Ez,
-                                      mass, inertia, Qe, SS)
+    # Accelerations using the current state
+    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE,
+                          BB, j_type, cc, ce, mass, inertia, Qi, Qe)
 
-    # Predict R0 and v0
-    Rdd0 = vd0_tmp
-    Rdd0_pred = Rdd0
-    R0_pred = R0 + k1 * v0 + k2 * Rdd0 + k3 * Rdd0_pred
-    Rd0_pred = v0 + k4 * (Rdd0 + Rdd0_pred)
-    v0_pred = Rd0_pred
+    # Predicted values for vd0, v0, and R0
+    vd0_p = vd0
+    v0_p = v0 + k4 * (vd0 + vd0_p)
+    R0_p = R0 + k1 * v0 + k2 * vd0 + k3 * vd0_p
 
-    # Predict q and qd
-    qdd = qdd_tmp
-    qdd_pred = qdd
-    q_pred = q + k1 * qd + k2 * qdd + k3 * qdd_pred
-    qd_pred = qd + k4 * (qdd + qdd_pred)
+    # Predict values for wd0, w0, and A0
+    wd0_p = wd0
+    w0_p = w0 + k4 * (wd0 + wd0_p)
+    A0_p = rotW(w0_p, dt) @ A0
 
-    # Predict w0 and A0
-    wd0 = wd0_tmp
-    wd0_pred = wd0
-    w0_pred = w0 + k4 * (wd0 + wd0_pred)
-    A0_pred = rotW(w0_pred, dt) @ A0
+    # Predicted values for qdd, qd, and q
+    qdd_p = qdd
+    qd_p = qd + k4 * (qdd + qdd_p)
+    q_p = q + k1 * qd + k2 * qdd + k3 * qdd_p
 
     # 2nd step: correction
     for i in range(n_reps):
 
-        # Get the acceleration terms for current state
-        vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0_pred, A0_pred, v0_pred, w0_pred,
-                                          q_pred, qd_pred, F0, T0, Fe, Te,
-                                          tau, SE, ce, BB, j_type, Qi, cc,
-                                          Ez, mass, inertia, Qe, SS)
+        # Accelerations using the predicted state
+        vd0, wd0, qdd = f_dyn(R0_p, A0_p, v0_p, w0_p, q_p, qd_p, F0, T0, tau,
+                              Fe, Te, SS, SE, BB, j_type, cc, ce, mass,
+                              inertia, Qi, Qe)
 
-        # Correct R0 and v0
-        Rdd0 = vd0_tmp
-        Rdd0_corr = Rdd0
-        R0_corr = R0 + k1 * v0 + k2 * Rdd0 + k3 * Rdd0_corr
-        Rd0_corr = v0 + k4 * (Rdd0 + Rdd0_corr)
-        v0_corr = Rd0_corr
+        # Corrected values for vd0, v0, and R0
+        vd0_c = vd0
+        v0_c = v0 + k4 * (vd0 + vd0_c)
+        R0_c = R0 + k1 * v0 + k2 * vd0 + k3 * vd0_c
 
-        # Correct q and qd
-        qdd = qdd_tmp
-        qdd_corr = qdd
-        q_corr = q + k1 * qd + k2 * qdd + k3 * qdd_corr
-        qd_corr = qd + k4 * (qdd + qdd_corr)
+        # Corrected values for wd0, w0, and A0
+        wd0_c = wd0
+        w0_c = w0 + k4 * (wd0 + wd0_c)
+        A0_c = rotW(w0_c, dt) @ A0
 
-        # Correct w0 and A0
-        wd0 = wd0_tmp
-        wd0_corr = wd0
-        w0_corr = w0 + k4 * (wd0 + wd0_corr)
-        A0_corr = rotW(w0_corr, dt) @ A0
+        # Corrected values for qdd, qd, and q
+        qdd_c = qdd
+        qd_c = qd + k4 * (qdd + qdd_c)
+        q_c = q + k1 * qd + k2 * qdd + k3 * qdd_c
 
-        # Next step
-        R0_pred = R0_corr
-        A0_pred = A0_corr
-        v0_pred = v0_corr
-        w0_pred = w0_corr
-        q_pred = q_corr
-        qd_pred = qd_corr
+        # Prepare next iteration
+        R0_p = R0_c
+        A0_p = A0_c
+        v0_p = v0_c
+        w0_p = w0_c
+        q_p = q_c
+        qd_p = qd_c
 
-    return R0_pred, A0_pred, v0_pred, w0_pred, q_pred, qd_pred
+    return R0_c, A0_c, v0_c, w0_c, q_c, qd_c
 
 
-def f_dyn_rk(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te, tau, dt, SE, ce, BB,
-             j_type, Qi, cc, mass, inertia, Qe, SS):
+def f_dyn_rk(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
+             j_type, cc, ce, mass, inertia, Qi, Qe):
     """
     Integration of the equations of motion using the Runge-Kutta method and
     the Rodrigues formula to update the rotations.
+
+    Given:
+    time-step                           dt
+    state at time <t>                   R0, A0, v0, w0, q, qd, at <t>
+    internal forces and moments         F0, T0, tau
+    external forces and moments         Fe, Te
+
+    Returns:
+    state at time <t+dt>                R0, A0, v0, w0, q, qd, at <t+dt>
     """
     # 1st step
-    vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0, A0, v0, w0, q, qd, F0, T0, Fe, Te,
-                                      tau, SE, ce, BB, j_type, Qi, cc, Ez,
-                                      mass, inertia, Qe, SS)
 
-    k1_R0 = v0 * dt
-    k1_A0 = rotW(w0, dt) @ A0 - A0
-    k1_q = qd * dt
-    k1_v0 = vd0_tmp * dt
-    k1_w0 = wd0_tmp * dt
-    k1_qd = qdd_tmp * dt
+    # Accelerations using the current state
+    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE,
+                          BB, j_type, cc, ce, mass, inertia, Qi, Qe)
+
+    # Predicted values for v0 and R0
+    v0_s1 = vd0 * dt
+    R0_s1 = v0 * dt
+
+    # Predict values for w0 and A0
+    w0_s1 = wd0 * dt
+    A0_s1 = rotW(w0, dt) @ A0 - A0
+
+    # Predicted values for qd and q
+    qd_s1 = qdd * dt
+    q_s1 = qd * dt
 
     # 2nd Step
-    vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0 + k1_R0 / 2.0, A0 + k1_A0 / 2.0,
-                                      v0 + k1_v0 / 2.0, w0 + k1_w0 / 2.0,
-                                      q + k1_q / 2.0, qd + k1_qd / 2.0,
-                                      F0, T0, Fe, Te, tau, SE, ce, BB,
-                                      j_type, Qi, cc, Ez, mass, inertia, Qe, SS)
 
-    k2_R0 = (v0 + k1_v0 / 2.0) * dt
-    k2_A0 = rotW(w0 + k1_w0 / 2.0, dt) @ A0 - A0
-    k2_q = (qd + k1_qd / 2.0) * dt
-    k2_v0 = vd0_tmp * dt
-    k2_w0 = wd0_tmp * dt
-    k2_qd = qdd_tmp * dt
+    # Accelerations using the state predicted by the 1st step
+    vd0, wd0, qdd = f_dyn(R0 + R0_s1 / 2.0, A0 + A0_s1 / 2.0, v0 + v0_s1 / 2.0,
+                          w0 + w0_s1 / 2.0, q + q_s1 / 2.0, qd + qd_s1 / 2.0,
+                          F0, T0, tau, Fe, Te, SS, SE, BB, j_type, cc, ce,
+                          mass, inertia, Qi, Qe)
+
+    # Predicted values for v0 and R0
+    v0_s2 = vd0 * dt
+    R0_s2 = (v0 + v0_s1 / 2.0) * dt
+
+    # Predict values for w0 and A0
+    w0_s2 = wd0 * dt
+    A0_s2 = rotW(w0 + w0_s1 / 2.0, dt) @ A0 - A0
+
+    # Predicted values for qd and q
+    qd_s2 = qdd * dt
+    q_s2 = (qd + qd_s1 / 2.0) * dt
 
     # 3rd Step
-    vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0 + k2_R0 / 2.0, A0 + k2_A0 / 2.0,
-                                      v0 + k2_v0 / 2.0, w0 + k2_w0 / 2.0,
-                                      q + k2_q / 2.0, qd + k2_qd / 2.0,
-                                      F0, T0, Fe, Te, tau, SE, ce, BB,
-                                      j_type, Qi, cc, Ez, mass, inertia, Qe, SS)
 
-    k3_R0 = (v0 + k2_v0 / 2.0) * dt
-    k3_A0 = rotW(w0 + k2_w0 / 2.0, dt) @ A0 - A0
-    k3_q = (qd + k2_qd / 2.0) * dt
-    k3_v0 = vd0_tmp * dt
-    k3_w0 = wd0_tmp * dt
-    k3_qd = qdd_tmp * dt
+    # Accelerations using the state predicted by the 2nd step
+    vd0, wd0, qdd = f_dyn(R0 + R0_s2 / 2.0, A0 + A0_s2 / 2.0, v0 + v0_s2 / 2.0,
+                          w0 + w0_s2 / 2.0, q + q_s2 / 2.0, qd + qd_s2 / 2.0,
+                          F0, T0, tau, Fe, Te, SS, SE, BB, j_type, cc, ce,
+                          mass, inertia, Qi, Qe)
+
+    # Predicted values for v0 and R0
+    v0_s3 = vd0 * dt
+    R0_s3 = (v0 + v0_s2 / 2.0) * dt
+
+    # Predict values for w0 and A0
+    w0_s3 = wd0 * dt
+    A0_s3 = rotW(w0 + w0_s2 / 2.0, dt) @ A0 - A0
+
+    # Predicted values for qd and q
+    qd_s3 = qdd * dt
+    q_s3 = (qd + qd_s2 / 2.0) * dt
 
     # 4th Step
-    vd0_tmp, wd0_tmp, qdd_tmp = f_dyn(R0 + k3_R0, A0 + k3_A0, v0 + k3_v0,
-                                      w0 + k3_w0, q + k3_q, qd + k3_qd,
-                                      F0, T0, Fe, Te, tau, SE, ce, BB,
-                                      j_type, Qi, cc, Ez, mass, inertia, Qe, SS)
 
-    k4_R0 = (v0 + k3_v0) * dt
-    k4_A0 = rotW(w0 + k3_w0, dt) @ A0 - A0
-    k4_q = (qd + k3_qd) * dt
-    k4_v0 = vd0_tmp * dt
-    k4_w0 = wd0_tmp * dt
-    k4_qd = qdd_tmp * dt
+    # Accelerations using the state predicted by the 3rd step
+    vd0, wd0, qdd = f_dyn(R0 + R0_s3, A0 + A0_s3, v0 + v0_s3, w0 + w0_s3,
+                          q + q_s3, qd + qd_s3, F0, T0, tau, Fe, Te, SS, SE,
+                          BB, j_type, cc, ce, mass, inertia, Qi, Qe)
 
-    # Compute Values at the Next Time Step
-    R0_pred = R0 + (k1_R0 + 2.0 * k2_R0 + 2.0 * k3_R0 + k4_R0) / 6.0
-    A0_pred = A0 + (k1_A0 + 2.0 * k2_A0 + 2.0 * k3_A0 + k4_A0) / 6.0
-    q_pred = q + (k1_q + 2.0 * k2_q + 2.0 * k3_q + k4_q) / 6.0
-    v0_pred = v0 + (k1_v0 + 2.0 * k2_v0 + 2.0 * k3_v0 + k4_v0) / 6.0
-    w0_pred = w0 + (k1_w0 + 2.0 * k2_w0 + 2.0 * k3_w0 + k4_w0) / 6.0
-    qd_pred = qd + (k1_qd + 2.0 * k2_qd + 2.0 * k3_qd + k4_qd) / 6.0
+    # Predicted values for v0 and R0
+    v0_s4 = vd0 * dt
+    R0_s4 = (v0 + v0_s3) * dt
 
-    return R0_pred, A0_pred, v0_pred, w0_pred, q_pred, qd_pred
+    # Predict values for w0 and A0
+    w0_s4 = wd0 * dt
+    A0_s4 = rotW(w0 + w0_s3, dt) @ A0 - A0
+
+    # Predicted values for qd and q
+    qd_s4 = qdd * dt
+    q_s4 = (qd + qd_s3) * dt
+
+    # Predicted values for the next step
+    R0_p = R0 + (R0_s1 + 2.0 * R0_s2 + 2.0 * R0_s3 + R0_s4) / 6.0
+    A0_p = A0 + (A0_s1 + 2.0 * A0_s2 + 2.0 * A0_s3 + A0_s4) / 6.0
+    q_p = q + (q_s1 + 2.0 * q_s2 + 2.0 * q_s3 + q_s4) / 6.0
+    v0_p = v0 + (v0_s1 + 2.0 * v0_s2 + 2.0 * v0_s3 + v0_s4) / 6.0
+    w0_p = w0 + (w0_s1 + 2.0 * w0_s2 + 2.0 * w0_s3 + w0_s4) / 6.0
+    qd_p = qd + (qd_s1 + 2.0 * qd_s2 + 2.0 * qd_s3 + qd_s4) / 6.0
+
+    return R0_p, A0_p, v0_p, w0_p, q_p, qd_p
