@@ -8,6 +8,30 @@ Python version of:
     (C)1998 The Space Robotics Lab. directed by Kazuya Yoshida,
     Tohoku University, Japan.
 """
+# test
+# ----
+# test_Jac
+# test_solve
+# test_extra
+# test_init
+# test_rne
+# test_nb
+# test_rk
+# test_f_dyn
+# test_HH
+# test_acc
+# test_conn
+# test_prop
+# test_state
+# test_endp
+# test_utils
+
+# what
+# ----
+# no_endpoints
+# base_only
+# base_joint
+# full_system
 
 import sys
 import numpy as np
@@ -19,7 +43,13 @@ import utils as utils
 import user as user
 
 pi = np.pi
-d2r = 180.0 / pi
+
+if (len(sys.argv) != 3):
+    print("Usage: python test.py <block-to-test> <what-to-test>")
+    sys.exit(1)
+test = sys.argv[1]
+what = sys.argv[2]
+
 
 # Links numbering starts from zero (the base)
 # --------------
@@ -34,7 +64,10 @@ name = 'foot/base'
 mass = 2.35
 inertia = mass * utils.inertia('none')
 cc = {1: [-0.15, 0.05, 0.0]}      # Leg connection
-foot = element.base(name=name, mass=mass, inertia=inertia, cc=cc)
+if (what == 'base_only'):
+    foot = element.base(name=name, mass=mass, inertia=inertia)
+else:
+    foot = element.base(name=name, mass=mass, inertia=inertia, cc=cc)
 
 # 1 - Leg
 name = 'leg'
@@ -46,6 +79,12 @@ cc = {1: [-0.25, 0.0, 0.0],      # Foot/base connection
       2: [ 0.20, 0.0, 0.0],      # Trunk connection
       4: [ 0.20, 0.0, 0.0]}      # Lower arm connection
 leg = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
+                   Qi=Qi, cc=cc)
+if (what == 'base_joint'):
+    leg = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
+                   Qi=Qi)
+else:
+    leg = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
                    Qi=Qi, cc=cc)
 
 # 2 - Trunk
@@ -78,36 +117,102 @@ cc = {4: [-0.23, 0.0, 0.0]}      # Leg connection
 lowerArm = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
                         Qi=Qi, cc=cc)
 
-# Endpoints
-ee = {
-      0: (3, [0.4, -0.05, 0.5], [0.0,  0.0, -pi/4]),
-      1: (4, [0.15, 0.0,  1.0], [0.0, -pi/3, pi/2]),
-     }
+if (what == 'no_endpoints'):
 
-# System
-name = 'simple robot'
-bodies = [foot, leg, trunk, upperArm, lowerArm]
-robot = element.model(name=name, bodies=bodies, ee=ee)
+    # Endpoints
+    pass
 
-# Initial conditions
-t0 = 0.0
-R0 = np.array([1.0, 2.0, 3.0])
-Q0 = np.array([0.1, 0.2, 0.3])
-A0 = utils.rpy2dc(Q0).T
-v0 = np.array([1.3, -2.2, 3.7])
-w0 = np.array([-0.2, 0.5, -0.4])
-q = np.array([0.1, 0.5, 1.0, 1.5])
-qd = np.array([-0.1, 0.2, -0.3, 0.4])
-robot.set_init(t0=t0, R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
+    # System
+    name = 'simple robot'
+    bodies = [foot, leg, trunk, upperArm, lowerArm]
+    robot = element.model(name=name, bodies=bodies, load=what)
+
+    # Initial conditions
+    t0 = 0.0
+    R0 = np.array([1.0, 2.0, 3.0])
+    Q0 = np.array([0.1, 0.2, 0.3])
+    A0 = utils.rpy2dc(Q0).T
+    v0 = np.array([1.3, -2.2, 3.7])
+    w0 = np.array([-0.2, 0.5, -0.4])
+    q = np.array([0.1, 0.5, 1.0, 1.5])
+    qd = np.array([-0.1, 0.2, -0.3, 0.4])
+    robot.set_init(t0=t0, R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
+
+elif (what == 'base_only'):
+
+    # Endpoints
+    pass
+
+    # System
+    name = 'simple robot'
+    bodies = [foot]
+    robot = element.model(name=name, bodies=bodies, load=what)
+
+    # Initial conditions
+    t0 = 0.0
+    R0 = np.array([1.0, 2.0, 3.0])
+    Q0 = np.array([0.1, 0.2, 0.3])
+    A0 = utils.rpy2dc(Q0).T
+    v0 = np.array([1.3, -2.2, 3.7])
+    w0 = np.array([-0.2, 0.5, -0.4])
+    q = np.array([])
+    qd = np.array([])
+    robot.set_init(t0=t0, R0=R0, A0=A0, v0=v0, w0=w0)
+
+elif (what == 'base_joint'):
+
+    # Endpoints
+    pass
+
+    # System
+    name = 'simple robot'
+    bodies = [foot, leg]
+    robot = element.model(name=name, bodies=bodies, load=what)
+
+    # Initial conditions
+    t0 = 0.0
+    R0 = np.array([1.0, 2.0, 3.0])
+    Q0 = np.array([0.1, 0.2, 0.3])
+    A0 = utils.rpy2dc(Q0).T
+    v0 = np.array([1.3, -2.2, 3.7])
+    w0 = np.array([-0.2, 0.5, -0.4])
+    q = np.array([0.1])
+    qd = np.array([-0.1])
+    robot.set_init(t0=t0, R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
+
+elif (what == 'full_system'):
+
+    # Endpoints
+    ee = {
+        0: (3, [0.4, -0.05, 0.5], [0.0,  0.0, -pi/4]),
+        1: (4, [0.15, 0.0,  1.0], [0.0, -pi/3, pi/2]),
+        }
+
+    # System
+    name = 'simple robot'
+    bodies = [foot, leg, trunk, upperArm, lowerArm]
+    robot = element.model(name=name, bodies=bodies, ee=ee, load=what)
+
+    # Initial conditions
+    t0 = 0.0
+    R0 = np.array([1.0, 2.0, 3.0])
+    Q0 = np.array([0.1, 0.2, 0.3])
+    A0 = utils.rpy2dc(Q0).T
+    v0 = np.array([1.3, -2.2, 3.7])
+    w0 = np.array([-0.2, 0.5, -0.4])
+    q = np.array([0.1, 0.5, 1.0, 1.5])
+    qd = np.array([-0.1, 0.2, -0.3, 0.4])
+    robot.set_init(t0=t0, R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
+
+else:
+    print("Nothing tested")
+    sys.exit(1)
 
 # ------- Test ------- #
 
-if (len(sys.argv) != 2):
-    print("Usage: python test.py <block-to-test>")
-    sys.exit(1)
-test = sys.argv[1]
+# The results are for <what = full_system>
 
-if (test == 'Jac_endpoint'):
+if (test == 'test_Jac'):
 
     print('\nJacobian due to the end point')
     # ie =  0 body =  3
@@ -132,7 +237,44 @@ if (test == 'Jac_endpoint'):
         print('ie = ', ie, ', body = ', robot.SE[ie])
         print(Jacobian)
 
-elif (test == 'extras'):
+elif (test == 'test_solve'):
+
+    t_start = 0.0
+    dt = 0.001
+    n_steps = 10
+
+    for i in range(n_steps):
+        t = t_start + float(i) * dt
+        print('time = ', t)
+        F0, T0, tau, Fe, Te = user.calc_forces(t, robot.num_j, robot.num_e,
+                                               load=what)
+        R0, A0, v0, w0, q, qd = \
+            dyn.f_dyn_nb(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te,
+                         robot.SS, robot.SE, robot.BB, robot.j_type,
+                         robot.cc, robot.ce, robot.mass, robot.inertia,
+                         robot.Qi, robot.Qe)
+
+    print('\nBase position and orientation')
+    # [1.01289885 1.97808658 3.03642847], shape (3, )
+    # [[ 0.93678955 -0.28520386  0.20269212]
+    #  [ 0.30890156  0.9462092  -0.09627032]
+    #  [-0.16433248  0.15279694  0.97449881]]
+    print(R0)
+    print(A0)
+
+    print('\nBase velocities')
+    # [ 1.2796825  -2.18245095  3.58574201], shape (3, )
+    # [-0.27735886  0.41257044 -0.39039339], shape (3, )
+    print(v0)
+    print(w0)
+
+    print('\nJoint position and velocity')
+    # [0.09966898 0.50277266 0.9916987  1.50480556], shape (num_j, )
+    # [ 0.03391805  0.35383625 -1.3420033   0.56059478], shape (num_j, )
+    print(q)
+    print(qd)
+
+elif (test == 'test_extra'):
 
     print('\nCoM (position, velocity, acceleration)')
     # [1.04890281 2.32886718 3.36831239], shape (3, 1)
@@ -203,9 +345,7 @@ elif (test == 'extras'):
     print(HM1_tot)
     print(HM1)
 
-    robot.calc_work(t0)
-
-elif (test == 'init'):
+elif (test == 'test_init'):
 
     print('\nLinear acceleration')
     # [[ -2.00047845  -0.74786001  -5.16041514  -3.96872974 -10.45866488]
@@ -219,7 +359,7 @@ elif (test == 'init'):
     #  [  0.92761215   0.92761215  14.13822187 -78.62679891   0.92761215]]
     print(robot.wd)
 
-elif (test == 'rne'):
+elif (test == 'test_rne'):
 
     print('\nData:')
     vd0 = np.array([-1.7, 2.4, -4.5])
@@ -233,7 +373,8 @@ elif (test == 'rne'):
     # [[-10.3  -12.36]
     #  [ 11.4   13.68]
     #  [ 20.4   24.48]]
-    F0, T0, tau, Fe, Te = user.calc_forces(t0, robot.num_j, robot.num_e)
+    F0, T0, tau, Fe, Te = user.calc_forces(t, robot.num_j, robot.num_e,
+                                           load=what)
     print(Fe)
 
     print('\nExternal moments')
@@ -258,13 +399,14 @@ elif (test == 'rne'):
     # [-21.82565933  -2.32047012   1.56963594 -17.20710116]
     print(Force[6:])
 
-elif (test == 'integ_nb'):
+elif (test == 'test_nb'):
 
     print('\nControl terms')
     # F0 =  [-1.7  2.4 -4.5], shape (3, )
     # T0 =  [ 0.3  -0.2   0.13], shape (3, )
     # tau =  [ 0.1 -0.3  0.6 -1.1], shape (num_j, )
-    F0, T0, tau, Fe, Te = user.calc_forces(t0, robot.num_j, robot.num_e)
+    F0, T0, tau, Fe, Te = user.calc_forces(t, robot.num_j, robot.num_e,
+                                           load=what)
     print('F0 = ', F0)
     print('T0 = ', T0)
     print('tau = ', tau)
@@ -306,13 +448,14 @@ elif (test == 'integ_nb'):
     print(q_c)
     print(qd_c)
 
-elif (test == 'integ_rk'):
+elif (test == 'test_rk'):
 
     print('\nControl terms')
     # F0 =  [-1.7  2.4 -4.5], shape (3, )
     # T0 =  [ 0.3  -0.2   0.13], shape (3, )
     # tau =  [ 0.1 -0.3  0.6 -1.1], shape (num_j, )
-    F0, T0, tau, Fe, Te = user.calc_forces(t0, robot.num_j, robot.num_e)
+    F0, T0, tau, Fe, Te = user.calc_forces(t, robot.num_j, robot.num_e,
+                                           load=what)
     print('F0 = ', F0)
     print('T0 = ', T0)
     print('tau = ', tau)
@@ -354,13 +497,14 @@ elif (test == 'integ_rk'):
     print(q_p)
     print(qd_p)
 
-elif (test == 'f_dyn'):
+elif (test == 'test_f_dyn'):
 
     print('\nControl terms')
     # F0 =  [-1.7  2.4 -4.5], shape (3, )
     # T0 =  [ 0.3  -0.2   0.13], shape (3, )
     # tau =  [ 0.1 -0.3  0.6 -1.1], shape (num_j, )
-    F0, T0, tau, Fe, Te = user.calc_forces(t0, robot.num_j, robot.num_e)
+    F0, T0, tau, Fe, Te = user.calc_forces(t, robot.num_j, robot.num_e,
+                                           load=what)
     print('F0 = ', F0)
     print('T0 = ', T0)
     print('tau = ', tau)
@@ -393,7 +537,7 @@ elif (test == 'f_dyn'):
     # [13.36313061   15.57472009 -109.54087316   16.22245975], shape (num_j, )
     print(qdd)
 
-elif (test == 'matrix_HH'):
+elif (test == 'test_HH'):
 
     print('\nMatrix HH shape')
     # (10, 10)
@@ -426,7 +570,7 @@ elif (test == 'matrix_HH'):
     #  [ 0.88        0.          0.          0.88      ]]
     print(HH[6:, 6:])
 
-elif (test == 'acceleration'):
+elif (test == 'test_acc'):
 
     print('\nData:')
     vd0 = np.array([-1.7, 2.4, -4.5])
@@ -450,7 +594,11 @@ elif (test == 'acceleration'):
     #  [ 0.13        0.13       -0.09711205  0.37052886  0.13      ]]
     print(wd)
 
-elif (test == 'connectivity'):
+elif (test == 'test_conn'):
+
+    print('\nNumber of bodies = ', robot.num_b)
+    print('Number of joints = ', robot.num_j)
+    print('Number of endpoints = ', robot.num_e)
 
     print('\nBodies upper connection(s) matrix')
     # [[-1  1  0  0  0]
@@ -471,7 +619,7 @@ elif (test == 'connectivity'):
     BB = robot.BB
     print(BB)
 
-elif (test == 'properties'):
+elif (test == 'test_prop'):
 
     print('\nMasses')
     # [2.35 0.43 1.41 0.72 0.88], shape (num_b, )
@@ -540,7 +688,7 @@ elif (test == 'properties'):
     #  [-0.78539816  1.57079633]]
     print(robot.Qe)
 
-elif (test == 'state'):
+elif (test == 'test_state'):
 
     print('\nSystem rotation matrices (transpose)')
     # [[ 0.93629336  0.31299183 -0.15934508]
@@ -582,7 +730,7 @@ elif (test == 'state'):
     #  [-0.4        -0.4        -0.23070288 -0.48464856 -0.4       ]]
     print(ww)
 
-elif (test == 'endpoint'):
+elif (test == 'test_endp'):
 
     print('\nLink sequence')
     # body =  0 sequence =  []
@@ -635,7 +783,7 @@ elif (test == 'endpoint'):
         print(POS_e)
         print(ORI_e)
 
-elif (test == 'utils'):
+elif (test == 'test_utils'):
 
     print('\nData:')
     roll = pi/6
@@ -740,3 +888,7 @@ elif (test == 'utils'):
     #  [ 0.14170444  0.07541627  0.98703204]]
     R = utils.rotW(w, dt)
     print(R)
+
+else:
+    print("Nothing tested")
+    sys.exit(1)

@@ -210,17 +210,17 @@ class link:
 
 class model:
 
-    def __init__(self, name=None, bodies=[], ee={}):
+    def __init__(self, name=None, bodies=[], ee={}, load=None):
         """
         name        str         Name
         bodies      num_b       List of bodies
         ee          dict        Position/orientation of end-points
-        Gravity     (3, )       Gravity
-        Ez          (3, )       Joint axis
+        load        str         Load type
         """
         self.name = name
         self.bodies = bodies
         self.ee = ee
+        self.load = load
 
         self.joints = self.bodies[1:]           # List of joints
         self.num_j = len(self.joints)           # Number of joints
@@ -246,15 +246,27 @@ class model:
         print('Name = ', self.name)
         print('Number of bodies = ', self.num_b)
         print('Number of joints = ', self.num_j)
+        print('Number of endpoints = ', self.num_e)
         print()
         print('CONNECTIVITY')
         print('SS =')
         print(self.SS)
-        print('SE =')
-        print(self.SE)
-        print('BB =')
-        print(self.BB)
+        print('SE = ', self.SE)
+        print('BB = ', self.BB)
+        print('joint type = ', self.j_type)
         print()
+        print('PROPERTIES')
+        print('Mass = ', self.mass)
+        print('Inertia =')
+        print(self.inertia)
+        print('Body-to-body connections =')
+        print(self.cc)
+        print('Body orientations =')
+        print(self.Qi)
+        print('Body-to-endpoint connections =')
+        print(self.ce)
+        print('Endpoint orientations =')
+        print(self.Qe)
 
         return
 
@@ -293,7 +305,7 @@ class model:
                                         self.BB, self.j_type, self.cc)
 
         # External forces and moments
-        F0, T0, tau, Fe, Te = user.calc_forces(t0, self.num_j, self.num_e)
+        F0, T0, tau, Fe, Te = user.calc_forces(t0, self.num_j, self.num_e, self.load)
 
         # Forward dynamics
         vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, self.q, self.qd, F0, T0,

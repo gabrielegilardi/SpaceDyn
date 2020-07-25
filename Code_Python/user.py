@@ -15,7 +15,7 @@ import kinematics as kin
 from utils import cross, rotW
 
 
-def calc_forces(time=0.0, num_j=0, num_e=0):
+def calc_forces(time=0.0, num_j=0, num_e=0, load=None):
     """
     Returns any external/control force/moment applied to the bodies.
 
@@ -39,22 +39,45 @@ def calc_forces(time=0.0, num_j=0, num_e=0):
     are applied to the endpoint with index 1, etc., up to endpoint with index
     num_e 
     """
-    # Control terms
-    F0 = np.array([-1.7, 2.4, -4.5])
-    T0 = np.array([0.3, -0.2, 0.13])
-    tau = np.array([0.1, -0.3, 0.6, -1.1])
-
-    # Endpoint terms
+    F0 = np.zeros(3)
+    T0 = np.zeros(3)
+    tau = np.zeros(num_j)
     Fe = np.zeros((3, num_e))
     Te = np.zeros((3, num_e))
 
-    # Endpoint index 0
-    Fe[:, 0] = np.array([-10.3, 11.4, 20.4])
-    Te[:, 0] = np.array([2.2, -4.4, 1.6])
+    # Full model
+    if (load == 'full_system'):
 
-    # Endpoint index 01
-    Fe[:, 1] = 1.2 * np.array([-10.3, 11.4, 20.4])
-    Te[:, 1] = -0.7 * np.array([2.2, -4.4, 1.6])
+        F0 = np.array([-1.7, 2.4, -4.5])
+        T0 = np.array([0.3, -0.2, 0.13])
+        tau = np.array([0.1, -0.3, 0.6, -1.1])
+    
+        Fe[:, 0] = np.array([-10.3, 11.4, 20.4])
+        Te[:, 0] = np.array([2.2, -4.4, 1.6])
+        Fe[:, 1] = 1.2 * np.array([-10.3, 11.4, 20.4])
+        Te[:, 1] = -0.7 * np.array([2.2, -4.4, 1.6])
+
+    # Model with base only, no links, no endpoints
+    elif (load == 'base_only'):
+
+        F0 = np.array([-1.7, 2.4, -4.5])
+        T0 = np.array([0.3, -0.2, 0.13])
+
+    # Model with base and one joint, no endpoints
+    elif (load == 'base_joint'):
+
+        F0 = np.array([-1.7, 2.4, -4.5])
+        T0 = np.array([0.3, -0.2, 0.13])
+        tau = np.array([0.1])
+
+    # Model with base and joints, no endpoints
+    elif (load == 'no_endpoints'):
+
+        F0 = np.array([-1.7, 2.4, -4.5])
+        T0 = np.array([0.3, -0.2, 0.13])
+        tau = np.array([0.1, -0.3, 0.6, -1.1])
+    
+    else:
+        pass
 
     return F0, T0, tau, Fe, Te
-
