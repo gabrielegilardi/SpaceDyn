@@ -166,14 +166,21 @@ def rotW(w, dt):
     Returns a rotation matrix representing the rotation |w| x dt about the
     angular velocity vector <w> using Rodrigues' formulation.
     """
+    eps = np.finfo(float).eps
+
     w = np.asarray(w).flatten()
     w_norm = np.linalg.norm(w)      # Norm
-    K = w / w_norm                  # Unit vector defining the rotation axis
-    theta = w_norm * dt             # Rotation
-    K_tilde = tilde(K)
-    st = np.sin(theta)
-    ct = np.cos(theta)
-    R = np.eye(3) + st * K_tilde + (1 - ct) * K_tilde @ K_tilde
+
+    if (w_norm < eps):
+        R = np.eye(3)
+        
+    else:
+        K = w / w_norm              # Unit vector defining the rotation axis
+        theta = w_norm * dt         # Rotation
+        K_tilde = tilde(K)
+        st = np.sin(theta)
+        ct = np.cos(theta)
+        R = np.eye(3) + st * K_tilde + (1 - ct) * K_tilde @ K_tilde
 
     return R
 

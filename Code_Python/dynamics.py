@@ -12,11 +12,11 @@ Python version of:
 import numpy as np
 
 import kinematics as kin
-from utils import cross, rotW, tilde
+from utils import cross, rotW, tilde, rpy2dc
 
 
 def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
-         ce, mass, inertia):
+         ce, mass, inertia, Qe):
     """
     Inverse dynamics computation by the recursive Newton-Euler method
     (eqs. 3.30-3.39).
@@ -27,9 +27,10 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
     external forces and moments         Fe, Te
 
     Returns:
-    internal forces and moments         F0, T0, tau
+    reaction forces and moments         F0, T0, tau
 
-    i.e. the system reaction forces and moments (base + joints).
+    i.e. the system reaction force <F0> and moment <T0> on the base, and the 
+    torque/forces <tau> on the joints.
     """
     num_j = len(q)              # Number of joints/links
     num_b = num_j + 1           # Number of bodies
@@ -43,7 +44,7 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
     # Linear and angular accelerations of all bodies
     vd, wd = kin.calc_acc(AA, ww, vd0, wd0, q, qd, qdd, BB, j_type, cc)
 
-    # Inertial forces and moments on the body centroids, (for convenience the
+    # Inertial forces and moments on the body centroids (for convenience the
     # the gravitational force is also included here) - eqs. 3.30-3.31
     F_in = np.zeros((3, num_b))
     T_in = np.zeros((3, num_b))
@@ -101,11 +102,15 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
             if (SE[ie] == i):
 
                 # Vector centroid <i> to endpoint <ie>
-                L_ie = ce[:, ie] - cc[:, i, i] + is_P * Ez * q[idxi]
+                A_i_ie = rpy2dc(Qe[:, ie]).T    # From endpoint to link/joint
+                A_I_ie = A_I_i @ A_i_ie         # From endpoint to inertial
+                L_i_ie = A_i_ie.T @ (ce[:, ie] - cc[:, i, i]
+                                     + is_P * Ez * q[idxi])
 
                 # Add external force and moment
-                F_jnt[:, idxi] -= Fe[:, ie]
-                T_jnt[:, idxi] -= (cross(A_I_i @ L_ie, Fe[:, ie]) + Te[:, ie])
+                F_jnt[:, idxi] -= A_I_ie @ Fe[:, ie]
+                T_jnt[:, idxi] -= A_I_ie @ (tilde(L_i_ie) @ Fe[:, ie]
+                                            + Te[:, ie])
 
     # Reaction force and moment on the base centroid (Eqs. 3.38 and 3.39)
     F0 = np.zeros(3)
@@ -130,8 +135,13 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
 
         # Add contribution if endpoint <ie> is connected to the base
         if (SE[ie] == 0):
-            F0 -= Fe[:, ie]
-            T0 -= (cross(AA[:, 0:3] @ ce[:, ie], Fe[:, ie]) + Te[:, ie])
+
+            A_0_ie = rpy2dc(Qe[:, ie]).T        # From endpoint to base
+            A_I_ie = AA[:, 0:3] @ A_0_ie        # From endpoint to inertial
+            R_0_ie = A_0_ie.T @ ce[:, ie]       # ce in endpoint frame
+
+            F0 -= A_I_ie @ Fe[:, ie]
+            T0 -= A_I_ie @ (tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie])
 
     # Calculation of joint torques/forces (eq. 3.36 and 3.37)
     tau = np.zeros(num_j)
@@ -154,15 +164,14 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
     return Force
 
 
-def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB, j_type, cc,
-          ce, mass, inertia, Qi, Qe):
+def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce, mass,
+          inertia, Qi, Qe):
     """
     Forward dynamics computation (chapter 3.6).
 
     Given:
     state                               R0, A0, v0, w0, q, qd
-    internal forces and moments         F0, T0, tau
-    external forces and moments         Fe, Te
+    external forces and moments         Fe, Te, tau
 
     Returns:
     accelerations                       vd0, wd0, qdd
@@ -173,7 +182,6 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB, j_type, cc,
     num_b = num_j + 1           # Number of bodies
     num_e = len(SE)             # Number of endpoints
     Ez = np.array([0.0, 0.0, 1.0])              # Joint axis direction
-    Gravity = np.array([0.0, 0.0, -9.81])       # Gravity vector
     Force = np.zeros(6+num_j)
 
     # Rotation matrices
@@ -186,18 +194,33 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB, j_type, cc,
     HH = kin.calc_hh(RR, AA, mass, inertia, BB, j_type, cc)
 
     # Calculation of velocty dependent terms using the recursive Newton-Eulero
-    # inverse dynamics setting to zero all the accelerations and all the
-    # external forces.
-    acc0 = np.zeros(3)
-    qdd0 = np.zeros(num_j)
-    Fe0 = np.zeros((3, num_e))
-    Force0 = r_ne(RR, AA, v0, w0, q, qd, acc0, acc0, qdd0, Fe0, Fe0, SS, SE,
-                  BB, j_type, cc, ce, mass, inertia)
+    # inverse dynamics setting to zero all accelerations and forces
+    zero_acc = np.zeros(3)
+    zero_qdd = np.zeros(num_j)
+    zero_Fe = np.zeros((3, num_e))
+    Force0 = r_ne(RR, AA, v0, w0, q, qd, zero_acc, zero_acc, zero_qdd, zero_Fe,
+                  zero_Fe, SS, SE, BB, j_type, cc, ce, mass, inertia, Qe)
 
-    # Generalized control terms on the base centroid and on the joints
+    # Generalized external forces applied on base centroid and joints
+    F0 = np.zeros(3)
+    T0 = np.zeros(3)
+
+    # Loop over all endpoints
+    for ie in range(num_e):
+
+        # If the endpoint is associated with the base
+        if (SE[ie] == 0):
+
+            A_0_ie = rpy2dc(Qe[:, ie]).T        # From endpoint to base
+            A_I_ie = AA[:, 0:3] @ A_0_ie        # From endpoint to inertial
+            R_0_ie = A_0_ie.T @ ce[:, ie]       # ce in endpoint frame
+
+            F0 += A_I_ie @ Fe[:, ie]
+            T0 += A_I_ie @ (tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie])
+
     Force = np.block([F0, T0, tau])
 
-    # Generalized terms due to the force and moments applied to the endpoints
+    # Generalized external forces applied to the link endpoints
     Fx = np.zeros(3)
     Tx = np.zeros(3)
     taux = np.zeros(num_j)
@@ -221,23 +244,16 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB, j_type, cc,
 
             # Endpoint position wrt the base centroid
             A_I_i = AA[:, 3*i:3*(i+1)]
+            A_I_ie = A_I_i @ rpy2dc(Qe[:, ie]).T
             R_0_ie = RR[:, i] - RR[:, 0] + A_I_i @ ce[:, ie]
 
             # Generalized terms due to this endpoint
-            Fx += Fe[:, ie]
-            Tx += tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie]
-            taux += JJ_tx_i.T @ Fe[:, ie] + JJ_rx_i.T @ Te[:, ie]
+            Fx += A_I_ie @ Fe[:, ie]
+            Tx += tilde(R_0_ie) @ A_I_ie @ Fe[:, ie] + A_I_ie @ Te[:, ie]
+            taux += JJ_tx_i.T @ A_I_ie @ Fe[:, ie] \
+                    + JJ_rx_i.T @ A_I_ie @ Te[:, ie]
 
-        # If the endpoint is associated with the base
-        else:
-
-            # Generalized terms due to this endpoint (no contribution to the
-            # joint terms)
-            R_0_ie = AA[:, 0:3] @ ce[:, ie]
-            Fx += Fe[:, ie]
-            Tx += tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie]
-
-    # Assemble the endpoint contributions
+    # Assemble the link endpoint contributions
     Force_ee = np.block([Fx, Tx, taux])
 
     # Calculation of the acceleration - eq. 3.29
@@ -250,8 +266,8 @@ def f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB, j_type, cc,
     return vd0, wd0, qdd
 
 
-def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
-             j_type, cc, ce, mass, inertia, Qi, Qe):
+def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc,
+             ce, mass, inertia, Qi, Qe):
     """
     Integration of the equations of motion using the Newmark-beta method and
     the Rodrigues formula to update the rotations.
@@ -259,8 +275,7 @@ def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
     Given:
     time-step                           dt
     state at time <t>                   R0, A0, v0, w0, q, qd, at <t>
-    internal forces and moments         F0, T0, tau
-    external forces and moments         Fe, Te
+    external forces and moments         Fe, Te, tau
 
     Returns:
     state at time <t+dt>                R0, A0, v0, w0, q, qd, at <t+dt>
@@ -284,8 +299,8 @@ def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
     # 1st step: prediction
 
     # Accelerations using the current state
-    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE,
-                          BB, j_type, cc, ce, mass, inertia, Qi, Qe)
+    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB,
+                          j_type, cc, ce, mass, inertia, Qi, Qe)
 
     # Predicted values for vd0, v0, and R0
     vd0_p = vd0
@@ -306,9 +321,8 @@ def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
     for i in range(n_reps):
 
         # Accelerations using the predicted state
-        vd0, wd0, qdd = f_dyn(R0_p, A0_p, v0_p, w0_p, q_p, qd_p, F0, T0, tau,
-                              Fe, Te, SS, SE, BB, j_type, cc, ce, mass,
-                              inertia, Qi, Qe)
+        vd0, wd0, qdd = f_dyn(R0_p, A0_p, v0_p, w0_p, q_p, qd_p, Fe, Te, tau,
+                              SS, SE, BB, j_type, cc, ce, mass, inertia, Qi, Qe)
 
         # Corrected values for vd0, v0, and R0
         vd0_c = vd0
@@ -336,8 +350,8 @@ def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
     return R0_c, A0_c, v0_c, w0_c, q_c, qd_c
 
 
-def f_dyn_rk(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
-             j_type, cc, ce, mass, inertia, Qi, Qe):
+def f_dyn_rk(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc,
+             ce, mass, inertia, Qi, Qe):
     """
     Integration of the equations of motion using the Runge-Kutta method and
     the Rodrigues formula to update the rotations.
@@ -345,8 +359,7 @@ def f_dyn_rk(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
     Given:
     time-step                           dt
     state at time <t>                   R0, A0, v0, w0, q, qd, at <t>
-    internal forces and moments         F0, T0, tau
-    external forces and moments         Fe, Te
+    external forces and moments         Fe, Te, tau
 
     Returns:
     state at time <t+dt>                R0, A0, v0, w0, q, qd, at <t+dt>
@@ -354,8 +367,8 @@ def f_dyn_rk(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
     # 1st step
 
     # Accelerations using the current state
-    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE,
-                          BB, j_type, cc, ce, mass, inertia, Qi, Qe)
+    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB,
+                          j_type, cc, ce, mass, inertia, Qi, Qe)
 
     # Predicted values for v0 and R0
     v0_s1 = vd0 * dt
@@ -374,8 +387,8 @@ def f_dyn_rk(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
     # Accelerations using the state predicted by the 1st step
     vd0, wd0, qdd = f_dyn(R0 + R0_s1 / 2.0, A0 + A0_s1 / 2.0, v0 + v0_s1 / 2.0,
                           w0 + w0_s1 / 2.0, q + q_s1 / 2.0, qd + qd_s1 / 2.0,
-                          F0, T0, tau, Fe, Te, SS, SE, BB, j_type, cc, ce,
-                          mass, inertia, Qi, Qe)
+                          Fe, Te, tau, SS, SE, BB, j_type, cc, ce, mass,
+                          inertia, Qi, Qe)
 
     # Predicted values for v0 and R0
     v0_s2 = vd0 * dt
@@ -394,8 +407,8 @@ def f_dyn_rk(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
     # Accelerations using the state predicted by the 2nd step
     vd0, wd0, qdd = f_dyn(R0 + R0_s2 / 2.0, A0 + A0_s2 / 2.0, v0 + v0_s2 / 2.0,
                           w0 + w0_s2 / 2.0, q + q_s2 / 2.0, qd + qd_s2 / 2.0,
-                          F0, T0, tau, Fe, Te, SS, SE, BB, j_type, cc, ce,
-                          mass, inertia, Qi, Qe)
+                          Fe, Te, tau, SS, SE, BB, j_type, cc, ce, mass,
+                          inertia, Qi, Qe)
 
     # Predicted values for v0 and R0
     v0_s3 = vd0 * dt
@@ -413,8 +426,8 @@ def f_dyn_rk(dt, R0, A0, v0, w0, q, qd, F0, T0, tau, Fe, Te, SS, SE, BB,
 
     # Accelerations using the state predicted by the 3rd step
     vd0, wd0, qdd = f_dyn(R0 + R0_s3, A0 + A0_s3, v0 + v0_s3, w0 + w0_s3,
-                          q + q_s3, qd + qd_s3, F0, T0, tau, Fe, Te, SS, SE,
-                          BB, j_type, cc, ce, mass, inertia, Qi, Qe)
+                          q + q_s3, qd + qd_s3, Fe, Te, tau, SS, SE, BB,
+                          j_type, cc, ce, mass, inertia, Qi, Qe)
 
     # Predicted values for v0 and R0
     v0_s4 = vd0 * dt

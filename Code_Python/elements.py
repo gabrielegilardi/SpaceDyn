@@ -300,20 +300,20 @@ class model:
         self.RR = kin.calc_pos(R0, self.AA, self.q, self.BB, self.j_type,
                                self.cc)
 
-        # Centroid velocities (linear and angular)
+        # Centroid linear and angular velocities
         self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
                                         self.BB, self.j_type, self.cc)
 
-        # External forces and moments
-        F0, T0, tau, Fe, Te = user.calc_forces(t0, self.num_j, self.num_e, self.load)
+        # External forces
+        Fe, Te, tau = user.calc_forces(t0, self.num_j, self.num_e, self.load)
 
         # Forward dynamics
-        vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, self.q, self.qd, F0, T0,
-                                  tau, Fe, Te, self.SS, self.SE, self.BB,
-                                  self.j_type, self.cc, self.ce, self.mass,
-                                  self.inertia, self.Qi, self.Qe)
+        vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, self.q, self.qd, Fe, Te,
+                                  tau, self.SS, self.SE, self.BB, self.j_type,
+                                  self.cc, self.ce, self.mass, self.inertia,
+                                  self.Qi, self.Qe)
 
-        # Centroid accelerations (linear and angular)
+        # Centroid linear and angular accelerations
         self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
                                         self.qd, qdd, self.BB, self.j_type,
                                         self.cc)
@@ -360,16 +360,19 @@ class model:
         components - on the base, on the joints, on the endpoints).
         """
         # Evaluate external forces and moments
-        F0, T0, tau, Fe, Te = user.calc_forces(time, self.num_j, self.num_e)
+        Fe, Te, tau = user.calc_forces(time, self.num_j, self.num_e, self.load)
 
-        # Work done by the control force/moment on the base
-        WK0 = (F0 * self.vv[:, 0] + T0 * self.ww[:, 0]).sum()
+        # Work done by the forces/moments on the endpoints (links and base)
+        WK0 = 0      # will be added later
+        WKe = 0      # will be added later
+        for ie in range(self.num_e):
+            if (self.SE[ie] == 0):
+                pass        # base
+            else:
+                pass        # link
 
         # Work done by the control forces/torques on the joints
         WKq = (tau * self.qd).sum()
-
-        # Work done by the forces/moments on the endpoints
-        WKe = 0      # will be added later
 
         WK = np.array([WK0, WKq, WKe])
 
