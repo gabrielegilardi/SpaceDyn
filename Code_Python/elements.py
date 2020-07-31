@@ -13,7 +13,7 @@ import numpy as np
 
 import kinematics as kin
 import dynamics as dyn
-from utils import cross, rpy2dc
+from utils import cross, rpy2dc, dc2rpy
 import user as user
 
 
@@ -270,7 +270,42 @@ class model:
 
         return
 
-    def set_init(self, t0=0.0, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
+    def simulate(self, ts=0.0, tf=1.0, dt=0.001, rec=None, load=None):
+        """
+        """
+        R0 = self.R0
+        A0 = self.A0
+        v0 = self.v0
+        w0 = self.w0
+        q = self.q
+        qd = self.qd
+        n_steps = int(np.round((tf - ts) / dt)) + 1
+        n_rec = int(np.round((tf - ts) / rec)) + 1
+        for i in range(1, n_steps):
+            t = ts + float(i) * dt
+            # print('time = ', t)
+            Fe, Te, tau = user.calc_forces(t, self.num_j, self.num_e, self.load)
+            R0, A0, v0, w0, q, qd = \
+                dyn.f_dyn_rk(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
+                             self.SE, self.BB, self.j_type, self.cc, self.ce,
+                             self.mass, self.inertia, self.Qi, self.Qe)
+
+        # Results
+        vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
+                                self.SE, self.BB, self.j_type, self.cc, self.ce,
+                                self.mass, self.inertia, self.Qi, self.Qe)
+        print('tf = ', t)
+        print('R0 = ', R0)
+        print('Q0 = ', dc2rpy(A0.T))
+        print('v0 = ', v0)
+        print('w0 = ', w0)
+        print('vd0 = ', vd0)
+        print('wd0 = ', wd0)
+        print('q =', q)
+        print('qd =', qd)
+        print('qdd =', qdd)
+
+    def set_init(self, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
                  w0=np.zeros(3), q=np.array([]), qd=np.array([])):
         """
         Initializes quantities at the starting time.
@@ -278,12 +313,10 @@ class model:
         Note: the zero refer to the base not to the time.
         """
         # Base (position, orientation, and velocities)
-        R0 = np.asarray(R0)
-        A0 = np.asarray(A0)
-        v0 = np.asarray(v0)
-        w0 = np.asarray(w0)
-
-        # Joints (rotations/displacements and velocities)
+        self.R0 = np.asarray(R0)
+        self.A0 = np.asarray(A0)
+        self.v0 = np.asarray(v0)
+        self.w0 = np.asarray(w0)
         if (len(q) > 0):
             self.q = q
         else:
@@ -293,30 +326,30 @@ class model:
         else:
             self.qd = np.zeros(self.num_j)
 
-        # Rotation matrices (link and joint frame are parallel)
-        self.AA = kin.calc_aa(A0, self.q, self.BB, self.j_type, self.Qi)
+        # # Rotation matrices (link and joint frame are parallel)
+        # self.AA = kin.calc_aa(A0, self.q, self.BB, self.j_type, self.Qi)
 
-        # Centroid positions
-        self.RR = kin.calc_pos(R0, self.AA, self.q, self.BB, self.j_type,
-                               self.cc)
+        # # Centroid positions
+        # self.RR = kin.calc_pos(R0, self.AA, self.q, self.BB, self.j_type,
+        #                        self.cc)
 
-        # Centroid linear and angular velocities
-        self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
-                                        self.BB, self.j_type, self.cc)
+        # # Centroid linear and angular velocities
+        # self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
+        #                                 self.BB, self.j_type, self.cc)
 
-        # External forces
-        Fe, Te, tau = user.calc_forces(t0, self.num_j, self.num_e, self.load)
+        # # External forces
+        # Fe, Te, tau = user.calc_forces(t0, self.num_j, self.num_e, self.load)
 
-        # Forward dynamics
-        vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, self.q, self.qd, Fe, Te,
-                                  tau, self.SS, self.SE, self.BB, self.j_type,
-                                  self.cc, self.ce, self.mass, self.inertia,
-                                  self.Qi, self.Qe)
+        # # Forward dynamics
+        # vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, self.q, self.qd, Fe, Te,
+        #                           tau, self.SS, self.SE, self.BB, self.j_type,
+        #                           self.cc, self.ce, self.mass, self.inertia,
+        #                           self.Qi, self.Qe)
 
-        # Centroid linear and angular accelerations
-        self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
-                                        self.qd, qdd, self.BB, self.j_type,
-                                        self.cc)
+        # # Centroid linear and angular accelerations
+        # self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
+        #                                 self.qd, qdd, self.BB, self.j_type,
+        #                                 self.cc)
 
     def calc_CoM(self):
         """

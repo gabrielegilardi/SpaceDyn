@@ -36,7 +36,7 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
     num_b = num_j + 1           # Number of bodies
     num_e = len(SE)             # Number of endpoints
     Ez = np.array([0.0, 0.0, 1.0])              # Joint axis direction
-    Gravity = np.array([0.0, 0.0, -9.81])       # Gravity vector
+    Gravity = np.array([-9.81, 0.0, 0.0])       # Gravity vector
 
     # Linear and angular velocities of all bodies
     vv, ww = kin.calc_vel(AA, v0, w0, q, qd, BB, j_type, cc)
@@ -274,8 +274,8 @@ def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc,
 
     Given:
     time-step                           dt
-    state at time <t>                   R0, A0, v0, w0, q, qd, at <t>
-    external forces and moments         Fe, Te, tau
+    state at time <t>                   R0, A0, v0, w0, q, qd, @ <t>
+    external forces and moments         Fe, Te, tau @ <t>
 
     Returns:
     state at time <t+dt>                R0, A0, v0, w0, q, qd, at <t+dt>
@@ -286,7 +286,7 @@ def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc,
     - beta = 0 corresponds to the central difference method.
     - beta = 1/4 corresponds to the constant acceleration method.
     - beta = 1/6 corresponds to the linear acceleration method.
-    - stability for any <dt> requires beta >= 1/4.
+    - stability for any <dt> requires beta >= 1/4. ?????????
     """
     # Newmark parameters
     n_reps = 1
