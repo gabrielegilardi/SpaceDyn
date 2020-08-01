@@ -280,7 +280,16 @@ class model:
         q = self.q
         qd = self.qd
         n_steps = int(np.round((tf - ts) / dt)) + 1
-        n_rec = int(np.round((tf - ts) / rec)) + 1
+        self.res = np.zeros([n_steps, 5])
+        AA = kin.calc_aa(A0, q, self.BB, self.j_type, self.Qi)
+        RR = kin.calc_pos(R0, AA, q, self.BB, self.j_type, self.cc)
+
+        self.res[0, 0] = ts
+        self.res[0, 1] = RR[0, 1]
+        self.res[0, 2] = RR[2, 1]
+        self.res[0, 3] = q[0]
+        self.res[0, 4] = qd[0]
+
         for i in range(1, n_steps):
             t = ts + float(i) * dt
             # print('time = ', t)
@@ -290,20 +299,17 @@ class model:
                              self.SE, self.BB, self.j_type, self.cc, self.ce,
                              self.mass, self.inertia, self.Qi, self.Qe)
 
-        # Results
-        vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
-                                self.SE, self.BB, self.j_type, self.cc, self.ce,
-                                self.mass, self.inertia, self.Qi, self.Qe)
-        print('tf = ', t)
-        print('R0 = ', R0)
-        print('Q0 = ', dc2rpy(A0.T))
-        print('v0 = ', v0)
-        print('w0 = ', w0)
-        print('vd0 = ', vd0)
-        print('wd0 = ', wd0)
-        print('q =', q)
-        print('qd =', qd)
-        print('qdd =', qdd)
+            # Results
+            vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
+                                    self.SE, self.BB, self.j_type, self.cc, self.ce,
+                                    self.mass, self.inertia, self.Qi, self.Qe)
+            AA = kin.calc_aa(A0, q, self.BB, self.j_type, self.Qi)
+            RR = kin.calc_pos(R0, AA, q, self.BB, self.j_type, self.cc)
+            self.res[i, 0] = t
+            self.res[i, 1] = RR[0, 1]
+            self.res[i, 2] = RR[2, 1]
+            self.res[i, 3] = q[0]
+            self.res[i, 4] = qd[0]
 
     def set_init(self, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
                  w0=np.zeros(3), q=np.array([]), qd=np.array([])):

@@ -20,16 +20,6 @@ import utils as utils
 import user as user
 
 
-def plot_res(results):
-    """
-    """
-    for result in results:
-
-        result = result.flatten()
-        plt.plot(result)
-
-    plt.grid(b=True)
-
 pi = np.pi
 
 # Links numbering starts from zero (the base)
@@ -42,9 +32,9 @@ pi = np.pi
 
 # 0 - Foot (base)
 name = 'foot/base'
-mass = 2.35
+mass = 2000.35
 inertia = mass * utils.inertia('none')
-cc = {1: [0.0, 0.0, 0.0]}      # Leg connection
+cc = {1: [0.0, 0.0, +0.6]}      # Leg connection
 foot = element.base(name=name, mass=mass, inertia=inertia, cc=cc)
 
 # 1 - Leg
@@ -52,8 +42,8 @@ name = 'leg'
 mass = 0.43
 inertia = mass * utils.inertia('cylinder', 0.2, 0.1, 0.4)
 j_type = 'R'
-Qi = [0.0, 0.0, 0.0]
-cc = {1: [-0.2, 0.0, 0.0]}      # Foot/base connection
+Qi = [pi/2, 0.0, 0.0]
+cc = {1: [0.0, -0.2, 0.0]}      # Foot/base connection
 leg = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
                    Qi=Qi, cc=cc)
 
@@ -95,6 +85,7 @@ lowerArm = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
 
 ee = {
     0: (0, [0.0,  0.0, 0.0], [0.0,  0.0, 0.0]),
+    1: (1, [0.0, +0.3, 0.0], [0.0,  0.0, 0.0]),
     }
 
 # System
@@ -110,49 +101,29 @@ Q0 = np.array([0.0, 0.0, 0.0])
 A0 = utils.rpy2dc(Q0).T
 v0 = np.array([0.0, 0.0, 0.0])
 w0 = np.array([0.0, 0.0, 0.0])
-q = np.array([0.0])
+q = np.array([2*pi/3])
 qd = np.array([0.0])
 robot.set_init(R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
 
 # Simulate
 ts = 0.0
-tf = 1.0
+tf = 2.0
 dt = 0.01
 rec = 0.1
 load = 'example'
 robot.simulate(ts=ts, tf=tf, dt=dt, rec=rec, load=load)
 
-# plt.subplot(231)
-# plot_res(pos)
-# plt.subplot(232)
-# plot_res(vel)
-# plt.subplot(233)
-# plot_res(acc)
-
-# plt.subplot(234)
-# plot_res(apos)
-# plt.subplot(235)
-# plot_res(avel)
-# plt.subplot(236)
-# plot_res(aacc)
-# plt.show()
-
-# plt.subplot(221)
-# plt.plot(pos[0, :], pos[2, :])
-# plt.xlabel('X')
-# plt.ylabel('Z')
-# plt.grid(b=True)
-# plt.subplot(222)
-# plt.plot(pos[0, :], pos[1, :])
-# plt.xlabel('X')
-# plt.ylabel('Y')
-# plt.grid(b=True)
-# plt.subplot(223)
-# plt.plot(pos[1, :], pos[2, :])
-# plt.xlabel('Y')
-# plt.ylabel('Z')
-# plt.grid(b=True)
-# plt.subplot(224, projection='3d')
-# plt.plot(pos[0, :], pos[1, :], pos[2, :])
-
-# plt.show()
+aa = robot.res
+plt.subplot(221)
+plt.plot(aa[:, 0], aa[:, 1])
+plt.grid(b=True)
+plt.subplot(222)
+plt.plot(aa[:, 0], aa[:, 2])
+plt.grid(b=True)
+plt.subplot(223)
+plt.plot(aa[:, 0], aa[:, 3])
+plt.grid(b=True)
+plt.subplot(224)
+plt.plot(aa[:, 0], aa[:, 4])
+plt.grid(b=True)
+plt.show()

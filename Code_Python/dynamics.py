@@ -36,7 +36,7 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
     num_b = num_j + 1           # Number of bodies
     num_e = len(SE)             # Number of endpoints
     Ez = np.array([0.0, 0.0, 1.0])              # Joint axis direction
-    Gravity = np.array([-9.81, 0.0, 0.0])       # Gravity vector
+    Gravity = np.array([0.0, 0.0, -9.81])       # Gravity vector
 
     # Linear and angular velocities of all bodies
     vv, ww = kin.calc_vel(AA, v0, w0, q, qd, BB, j_type, cc)
