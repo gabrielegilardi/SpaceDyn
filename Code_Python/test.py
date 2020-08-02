@@ -41,9 +41,9 @@ foot = element.base(name=name, mass=mass, inertia=inertia, cc=cc)
 name = 'leg'
 mass = 0.43
 inertia = mass * utils.inertia('cylinder', 0.2, 0.1, 0.4)
-j_type = 'R'
-Qi = [pi/2, 0.0, 0.0]
-cc = {1: [0.0, -0.2, 0.0]}      # Foot/base connection
+j_type = 'P'
+Qi = [0.0, pi/2, 0.0]
+cc = {1: [0.0, 0.0, -0.2]}      # Foot/base connection
 leg = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
                    Qi=Qi, cc=cc)
 
@@ -85,7 +85,7 @@ lowerArm = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
 
 ee = {
     0: (0, [0.0,  0.0, 0.0], [0.0,  0.0, 0.0]),
-    1: (1, [0.0, +0.3, 0.0], [0.0,  0.0, 0.0]),
+    1: (1, [0.0,  0.0, 0.3], [0.0,  0.0, 0.0]),
     }
 
 # System
@@ -101,13 +101,13 @@ Q0 = np.array([0.0, 0.0, 0.0])
 A0 = utils.rpy2dc(Q0).T
 v0 = np.array([0.0, 0.0, 0.0])
 w0 = np.array([0.0, 0.0, 0.0])
-q = np.array([2*pi/3])
+q = np.array([0.0])
 qd = np.array([0.0])
 robot.set_init(R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
 
 # Simulate
 ts = 0.0
-tf = 2.0
+tf = 1.0
 dt = 0.01
 rec = 0.1
 load = 'example'

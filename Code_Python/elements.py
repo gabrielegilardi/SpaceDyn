@@ -285,10 +285,10 @@ class model:
         RR = kin.calc_pos(R0, AA, q, self.BB, self.j_type, self.cc)
 
         self.res[0, 0] = ts
-        self.res[0, 1] = RR[0, 1]
-        self.res[0, 2] = RR[2, 1]
+        self.res[0, 1] = R0[2]
+        self.res[0, 2] = 0.0
         self.res[0, 3] = q[0]
-        self.res[0, 4] = qd[0]
+        self.res[0, 4] = RR[0, 1]
 
         for i in range(1, n_steps):
             t = ts + float(i) * dt
@@ -306,10 +306,10 @@ class model:
             AA = kin.calc_aa(A0, q, self.BB, self.j_type, self.Qi)
             RR = kin.calc_pos(R0, AA, q, self.BB, self.j_type, self.cc)
             self.res[i, 0] = t
-            self.res[i, 1] = RR[0, 1]
-            self.res[i, 2] = RR[2, 1]
+            self.res[i, 1] = R0[2]
+            self.res[i, 2] = vd0[2]
             self.res[i, 3] = q[0]
-            self.res[i, 4] = qd[0]
+            self.res[i, 4] = RR[0, 1]
 
     def set_init(self, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
                  w0=np.zeros(3), q=np.array([]), qd=np.array([])):

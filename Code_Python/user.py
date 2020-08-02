@@ -78,11 +78,11 @@ def calc_forces(time=0.0, num_j=0, num_e=0, load=None):
     
     # Example
     elif (load == 'example'):
-        m = 2000.35 + 0.43
-        Fe[:, 0] = np.array([0.0, 0.0, m * 9.81])
-        Fe[:, 1] = np.array([0.0, 0.0, 0.0])
-        Te[:, 1] = np.array([0.0, 0.0, 0.0])
-        # tau = np.array([0.6])
+        m = 2000.35
+        # Fe[:, 0] = np.array([0.0, 0.0, m * 9.81])
+        # Fe[:, 1] = np.array([0.0, 0.0, 1.0])
+        # Te[:, 1] = np.array([0.0, 0.0, 0.0])
+        tau = np.array([1.3])
 
     else:
         pass
