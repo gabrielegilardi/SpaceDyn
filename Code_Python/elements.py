@@ -285,14 +285,12 @@ class model:
         qd = self.qd
         n_steps = int(np.round((tf - ts) / dt)) + 1
         self.res = np.zeros([n_steps, 5])
-        AA = kin.calc_aa(A0, q, self.BB, self.j_type, self.Qi)
-        RR = kin.calc_pos(R0, AA, q, self.BB, self.j_type, self.cc)
 
         self.res[0, 0] = ts
-        self.res[0, 1] = R0[2]
-        self.res[0, 2] = dc2rpy(A0.T)[1]
-        self.res[0, 3] = q[0]
-        self.res[0, 4] = qd[0]
+        self.res[0, 1] = R0[0]
+        self.res[0, 2] = R0[1]
+        self.res[0, 3] = R0[2]
+        self.res[0, 4] = q[0]
 
         for i in range(1, n_steps):
             t = ts + float(i) * dt
@@ -307,16 +305,21 @@ class model:
             vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
                                     self.SE, self.BB, self.j_type, self.cc, self.ce,
                                     self.mass, self.inertia, self.Qi, self.Qe)
-            AA = kin.calc_aa(A0, q, self.BB, self.j_type, self.Qi)
-            RR = kin.calc_pos(R0, AA, q, self.BB, self.j_type, self.cc)
+            self.AA = kin.calc_aa(A0, q, self.BB, self.j_type, self.Qi)
+            self.RR = kin.calc_pos(R0, self.AA, q, self.BB, self.j_type, self.cc)
+            self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
+                                            self.BB, self.j_type, self.cc)
+            self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
+                                            self.qd, qdd, self.BB, self.j_type,
+                                            self.cc)
             self.res[i, 0] = t
-            self.res[i, 1] = R0[2]
-            self.res[i, 2] = dc2rpy(A0.T)[1]
-            self.res[i, 3] = q[0]
-            self.res[i, 4] = qd[0]
+            self.res[i, 1] = 0.0
+            self.res[i, 2] = 0.0
+            self.res[i, 3] = 0.0
+            self.res[i, 4] = 0.0
 
-    def set_init(self, t0=0.0, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
-                 w0=np.zeros(3), q=np.array([]), qd=np.array([])):
+    def set_init(self, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
+                       w0=np.zeros(3), q=np.array([]), qd=np.array([])):
         """
         Initializes quantities at the starting time.
 
@@ -354,7 +357,6 @@ class model:
         # vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, self.q, self.qd, Fe, Te,
         #                           tau, self.SS, self.SE, self.BB, self.j_type,
         #                           self.cc, self.ce, self.mass, self.inertia,
-
         #                           self.Qi, self.Qe)
 
         # # Centroid linear and angular accelerations
@@ -409,11 +411,11 @@ class model:
         # Work done by the forces/moments on the endpoints (links and base)
         WK0 = 0      # will be added later
         WKe = 0      # will be added later
-        for ie in range(self.num_e):
-            if (self.SE[ie] == 0):
-                pass        # base
-            else:
-                pass        # link
+        # for ie in range(self.num_e):
+        #     if (self.SE[ie] == 0):
+        #         pass        # base
+        #     else:
+        #         pass        # link
 
         # Work done by the control forces/torques on the joints
         WKq = (tau * self.qd).sum()
