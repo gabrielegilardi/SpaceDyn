@@ -42,7 +42,7 @@ name = 'leg'
 mass = 0.43
 inertia = mass * utils.inertia('cylinder', 0.2, 0.1, 0.4)
 j_type = 'P'
-Qi = [0.0, pi/2, 0.0]
+Qi = [0.0, 0.0, 0.0]
 cc = {1: [0.0, 0.0, -0.2]}      # Foot/base connection
 leg = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
                    Qi=Qi, cc=cc)
@@ -84,8 +84,8 @@ lowerArm = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
 #     }
 
 ee = {
-    0: (0, [0.0,  0.0, 0.0], [0.0,  0.0, 0.0]),
-    1: (1, [0.0,  0.0, 0.3], [0.0,  0.0, 0.0]),
+    0: (0, [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], 'L'),
+    1: (1, [0.0, 0.0, 0.3], [0.0, 0.0, 0.0], 'I'),
     }
 
 # System
@@ -127,3 +127,8 @@ plt.subplot(224)
 plt.plot(aa[:, 0], aa[:, 4])
 plt.grid(b=True)
 plt.show()
+print(aa[-1,1])
+print(aa[-1,2])
+print(aa[-1,3])
+print(aa[-1,4])
+

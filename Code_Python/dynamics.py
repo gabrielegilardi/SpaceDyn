@@ -34,7 +34,7 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
     """
     num_j = len(q)              # Number of joints/links
     num_b = num_j + 1           # Number of bodies
-    num_e = len(SE)             # Number of endpoints
+    num_e = SE.shape[1]         # Number of endpoints
     Ez = np.array([0.0, 0.0, 1.0])              # Joint axis direction
     Gravity = np.array([0.0, 0.0, -9.81])       # Gravity vector
 
@@ -99,18 +99,26 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
         for ie in range(num_e):
 
             # Add contribution if endpoint <ie> is connected to link <i>
-            if (SE[ie] == i):
+            if (SE[0, ie] == i):
 
                 # Vector centroid <i> to endpoint <ie>
-                A_i_ie = rpy2dc(Qe[:, ie]).T    # From endpoint to link/joint
-                A_I_ie = A_I_i @ A_i_ie         # From endpoint to inertial
-                L_i_ie = A_i_ie.T @ (ce[:, ie] - cc[:, i, i]
-                                     + is_P * Ez * q[idxi])
+                A_i_ie = rpy2dc(Qe[:, ie]).T        # Endpoint to link/joint
+                A_I_ie = A_I_i @ A_i_ie             # Endpoint to inertial
 
-                # Add external force and moment
-                F_jnt[:, idxi] -= A_I_ie @ Fe[:, ie]
-                T_jnt[:, idxi] -= A_I_ie @ (tilde(L_i_ie) @ Fe[:, ie]
-                                            + Te[:, ie])
+                # If the external load is given wrt the local frame
+                if (SE[1, ie] == 0):
+                    L_i_ie = A_i_ie.T @ (ce[:, ie] - cc[:, i, i]
+                                        + is_P * Ez * q[idxi])
+                    F_jnt[:, idxi] -= A_I_ie @ Fe[:, ie]
+                    T_jnt[:, idxi] -= A_I_ie @ (tilde(L_i_ie) @ Fe[:, ie]
+                                                + Te[:, ie])
+
+                # If the external load is given wrt the inertial frame
+                else:
+                    L_i_ie = A_I_ie @ (ce[:, ie] - cc[:, i, i]
+                                        + is_P * Ez * q[idxi])
+                    F_jnt[:, idxi] -= Fe[:, ie]
+                    T_jnt[:, idxi] -= (tilde(L_i_ie) @ Fe[:, ie] + Te[:, ie])
 
     # Reaction force and moment on the base centroid (Eqs. 3.38 and 3.39)
     F0 = np.zeros(3)
@@ -134,14 +142,22 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
     for ie in range(num_e):
 
         # Add contribution if endpoint <ie> is connected to the base
-        if (SE[ie] == 0):
+        if (SE[0, ie] == 0):
 
-            A_0_ie = rpy2dc(Qe[:, ie]).T        # From endpoint to base
-            A_I_ie = AA[:, 0:3] @ A_0_ie        # From endpoint to inertial
-            R_0_ie = A_0_ie.T @ ce[:, ie]       # ce in endpoint frame
+            A_0_ie = rpy2dc(Qe[:, ie]).T        # Endpoint to base
+            A_I_ie = AA[:, 0:3] @ A_0_ie        # Endpoint to inertial
 
-            F0 -= A_I_ie @ Fe[:, ie]
-            T0 -= A_I_ie @ (tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie])
+            # If the external load is given wrt the local frame
+            if (SE[1, ie] == 0):
+                R_0_ie = A_0_ie.T @ ce[:, ie]
+                F0 -= A_I_ie @ Fe[:, ie]
+                T0 -= A_I_ie @ (tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie])
+
+            # If the external load is given wrt the inertial frame
+            else:
+                R_0_ie = A_0_ie @ ce[:, ie]
+                F0 -= Fe[:, ie]
+                T0 -= (tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie])
 
     # Calculation of joint torques/forces (eq. 3.36 and 3.37)
     tau = np.zeros(num_j)
@@ -180,7 +196,7 @@ def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce, mass,
     """
     num_j = len(q)              # Number of joints/links
     num_b = num_j + 1           # Number of bodies
-    num_e = len(SE)             # Number of endpoints
+    num_e = SE.shape[1]             # Number of endpoints
     Ez = np.array([0.0, 0.0, 1.0])              # Joint axis direction
     Force = np.zeros(6+num_j)
 
@@ -209,14 +225,22 @@ def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce, mass,
     for ie in range(num_e):
 
         # If the endpoint is associated with the base
-        if (SE[ie] == 0):
+        if (SE[0, ie] == 0):
 
-            A_0_ie = rpy2dc(Qe[:, ie]).T        # From endpoint to base
-            A_I_ie = AA[:, 0:3] @ A_0_ie        # From endpoint to inertial
-            R_0_ie = A_0_ie.T @ ce[:, ie]       # ce in endpoint frame
+            A_0_ie = rpy2dc(Qe[:, ie]).T        # Endpoint to base
+            A_I_ie = AA[:, 0:3] @ A_0_ie        # Endpoint to inertial
 
-            F0 += A_I_ie @ Fe[:, ie]
-            T0 += A_I_ie @ (tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie])
+            # If the external load is given wrt the local frame
+            if (SE[1, ie] == 0):
+                R_0_ie = A_0_ie.T @ ce[:, ie]
+                F0 += A_I_ie @ Fe[:, ie]
+                T0 += A_I_ie @ (tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie])
+
+            # If the external load is given wrt the inertial frame
+            else:
+                R_0_ie = A_0_ie @ ce[:, ie]
+                F0 += Fe[:, ie]
+                T0 += (tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie])
 
     Force = np.block([F0, T0, tau])
 
@@ -228,7 +252,7 @@ def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce, mass,
     # Loop over all endpoints
     for ie in range(num_e):
 
-        i = SE[ie]          # Link associated to the endpoint <ie>
+        i = SE[0, ie]          # Link associated to the endpoint <ie>
 
         # If the endpoint is associated with a link
         if (i > 0):
@@ -247,11 +271,18 @@ def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce, mass,
             A_I_ie = A_I_i @ rpy2dc(Qe[:, ie]).T
             R_0_ie = RR[:, i] - RR[:, 0] + A_I_i @ ce[:, ie]
 
-            # Generalized terms due to this endpoint
-            Fx += A_I_ie @ Fe[:, ie]
-            Tx += tilde(R_0_ie) @ A_I_ie @ Fe[:, ie] + A_I_ie @ Te[:, ie]
-            taux += JJ_tx_i.T @ A_I_ie @ Fe[:, ie] \
-                    + JJ_rx_i.T @ A_I_ie @ Te[:, ie]
+            # If the external load is given wrt the local frame
+            if (SE[1, ie] == 0):
+                Fx += A_I_ie @ Fe[:, ie]
+                Tx += tilde(R_0_ie) @ A_I_ie @ Fe[:, ie] + A_I_ie @ Te[:, ie]
+                taux += + JJ_tx_i.T @ A_I_ie @ Fe[:, ie] \
+                        + JJ_rx_i.T @ A_I_ie @ Te[:, ie]
+
+            # If the external load is given wrt the inertial frame
+            else:
+                Fx += Fe[:, ie]
+                Tx += tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie]
+                taux += JJ_tx_i.T @ Fe[:, ie] + JJ_rx_i.T @ Te[:, ie]
 
     # Assemble the link endpoint contributions
     Force_ee = np.block([Fx, Tx, taux])

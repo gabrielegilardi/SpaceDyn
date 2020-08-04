@@ -40,9 +40,13 @@ def connectivity(bodies, ee):
         SS[i, i] = -1               # Value for the base never used
 
     # Base-to-endpoint and link-to-endpoint connections
-    SE = np.zeros(num_e, dtype=int)
+    # 1 --> external load is in the inertial frame
+    # 0 --> external load is in the local frame (default)
+    SE = np.zeros((2, num_e), dtype=int)
     for i, v in ee.items():
-        SE[i] = v[0]
+        SE[0, i] = v[0]
+        if (v[3] == 'I'):
+            SE[1, i] = 1
 
     # Previous body connection (BB[0] for body 1, BB[1] for body 2, etc.)
     BB = np.zeros(num_b-1, dtype=int)
@@ -286,9 +290,9 @@ class model:
 
         self.res[0, 0] = ts
         self.res[0, 1] = R0[2]
-        self.res[0, 2] = 0.0
+        self.res[0, 2] = dc2rpy(A0.T)[1]
         self.res[0, 3] = q[0]
-        self.res[0, 4] = RR[0, 1]
+        self.res[0, 4] = qd[0]
 
         for i in range(1, n_steps):
             t = ts + float(i) * dt
@@ -307,11 +311,11 @@ class model:
             RR = kin.calc_pos(R0, AA, q, self.BB, self.j_type, self.cc)
             self.res[i, 0] = t
             self.res[i, 1] = R0[2]
-            self.res[i, 2] = vd0[2]
+            self.res[i, 2] = dc2rpy(A0.T)[1]
             self.res[i, 3] = q[0]
-            self.res[i, 4] = RR[0, 1]
+            self.res[i, 4] = qd[0]
 
-    def set_init(self, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
+    def set_init(self, t0=0.0, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
                  w0=np.zeros(3), q=np.array([]), qd=np.array([])):
         """
         Initializes quantities at the starting time.
@@ -350,6 +354,7 @@ class model:
         # vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, self.q, self.qd, Fe, Te,
         #                           tau, self.SS, self.SE, self.BB, self.j_type,
         #                           self.cc, self.ce, self.mass, self.inertia,
+
         #                           self.Qi, self.Qe)
 
         # # Centroid linear and angular accelerations
