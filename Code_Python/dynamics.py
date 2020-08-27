@@ -12,7 +12,7 @@ Python version of:
 import numpy as np
 
 import kinematics as kin
-from utils import cross, rotW, tilde, rpy2dc
+from utils import cross, rotW, tilde, rpy2dc, dc2rpy
 
 
 def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
@@ -180,8 +180,8 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
     return Force
 
 
-def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce, mass,
-          inertia, Qi, Qe):
+def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce,
+          mass, inertia, Qi, Qe):
     """
     Forward dynamics computation (chapter 3.6).
 
@@ -194,9 +194,9 @@ def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce, mass,
 
     i.e. the system linear and angular accelerations (base + joints).
     """
-    num_j = len(q)              # Number of joints/links
-    num_b = num_j + 1           # Number of bodies
-    num_e = SE.shape[1]             # Number of endpoints
+    num_j = len(q)                              # Number of joints/links
+    num_b = num_j + 1                           # Number of bodies
+    num_e = SE.shape[1]                         # Number of endpoints
     Ez = np.array([0.0, 0.0, 1.0])              # Joint axis direction
     Force = np.zeros(6+num_j)
 
@@ -287,7 +287,7 @@ def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce, mass,
     # Assemble the link endpoint contributions
     Force_ee = np.block([Fx, Tx, taux])
 
-    # Calculation of the acceleration - eq. 3.29
+    # Calculate the accelerations - eq. 3.29
     acc = np.linalg.inv(HH) @ (Force + Force_ee - Force0)
 
     vd0 = acc[0:3]
@@ -305,80 +305,130 @@ def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc,
 
     Given:
     time-step                           dt
-    state at time <t>                   R0, A0, v0, w0, q, qd, @ <t>
+    state at time <t>                   R0, Q0, v0, w0, q, qd, @ <t>
     external forces and moments         Fe, Te, tau @ <t>
 
     Returns:
-    state at time <t+dt>                R0, A0, v0, w0, q, qd, at <t+dt>
+    state at time <t+dt>                R0, Q0, v0, w0, q, qd, at <t+dt>
 
     Notes:
-    - equations are written assuming gamma = 1/2 to guarantee the 2nd order
-      accuracy in the solution.
+    - gamma = 1/2 guarantees the 2nd order accuracy in the solution.
     - beta = 0 corresponds to the central difference method.
     - beta = 1/4 corresponds to the constant acceleration method.
     - beta = 1/6 corresponds to the linear acceleration method.
-    - stability for any <dt> requires beta >= 1/4. ?????????
+    - stability for any <dt> requires beta >= 1/4. ??????? (or is it <= ?)
     """
     # Newmark parameters
-    n_reps = 1
-    beta = 1.0/6.0
-    k1 = dt
-    k2 = dt * dt / 3.0
-    k3 = dt * dt * beta
-    k4 = dt / 2.0
+    n_reps = 10
+    beta = 1.0 / 6.0
+    gamma = 0.5
 
-    # 1st step: prediction
-
-    # Accelerations using the current state
+    # Accelerations
     vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB,
                           j_type, cc, ce, mass, inertia, Qi, Qe)
 
-    # Predicted values for vd0, v0, and R0
-    vd0_p = vd0
-    v0_p = v0 + k4 * (vd0 + vd0_p)
-    R0_p = R0 + k1 * v0 + k2 * vd0 + k3 * vd0_p
+    # Prediction (assume acc_p = acc)
+    v0_p = v0 + vd0 * dt
+    R0_p = R0 + v0 * dt + 0.5 * vd0 * dt ** 2
+    w0_p = w0 + wd0 * dt
+    delta_Q0 = w0 * dt + 0.5 * wd0 * dt ** 2
+    A0_p = rpy2dc(delta_Q0).T @ A0
+    qd_p = qd + qdd * dt
+    q_p = q + qd * dt + 0.5 * qdd * dt ** 2
 
-    # Predict values for wd0, w0, and A0
-    wd0_p = wd0
-    w0_p = w0 + k4 * (wd0 + wd0_p)
-    A0_p = rotW(w0_p, dt) @ A0
-
-    # Predicted values for qdd, qd, and q
-    qdd_p = qdd
-    qd_p = qd + k4 * (qdd + qdd_p)
-    q_p = q + k1 * qd + k2 * qdd + k3 * qdd_p
-
-    # 2nd step: correction
+    # Correction
     for i in range(n_reps):
 
         # Accelerations using the predicted state
-        vd0, wd0, qdd = f_dyn(R0_p, A0_p, v0_p, w0_p, q_p, qd_p, Fe, Te, tau,
-                              SS, SE, BB, j_type, cc, ce, mass, inertia, Qi, Qe)
+        vd0_p, wd0_p, qdd_p = f_dyn(R0_p, A0_p, v0_p, w0_p, q_p, qd_p, Fe, Te,
+                                    tau, SS, SE, BB, j_type, cc, ce, mass,
+                                    inertia, Qi, Qe)
 
-        # Corrected values for vd0, v0, and R0
-        vd0_c = vd0
-        v0_c = v0 + k4 * (vd0 + vd0_c)
-        R0_c = R0 + k1 * v0 + k2 * vd0 + k3 * vd0_c
+        # Corrected value
+        v0_p = v0 + ((1.0 - gamma) * vd0 + gamma * vd0_p) * dt
+        R0_p = R0 + v0 * dt + ((0.5 - beta) * vd0 + beta * vd0_p) * dt ** 2
+        w0_p = w0 + ((1.0 - gamma) * wd0 + gamma * wd0_p) * dt
+        delta_Q0 = w0 * dt + ((0.5 - beta) * wd0 + beta * wd0_p) * dt ** 2
+        A0_p = rpy2dc(delta_Q0).T @ A0
+        qd_p = qd + ((1.0 - gamma) * qdd + gamma * qdd_p) * dt
+        q_p = q + qd * dt + ((0.5 - beta) * qdd + beta * qdd_p) * dt ** 2
 
-        # Corrected values for wd0, w0, and A0
-        wd0_c = wd0
-        w0_c = w0 + k4 * (wd0 + wd0_c)
-        A0_c = rotW(w0_c, dt) @ A0
+    return R0_p, A0_p, v0_p, w0_p, q_p, qd_p
 
-        # Corrected values for qdd, qd, and q
-        qdd_c = qdd
-        qd_c = qd + k4 * (qdd + qdd_c)
-        q_c = q + k1 * qd + k2 * qdd + k3 * qdd_c
 
-        # Prepare next iteration
-        R0_p = R0_c
-        A0_p = A0_c
-        v0_p = v0_c
-        w0_p = w0_c
-        q_p = q_c
-        qd_p = qd_c
+def f_dyn_alpha(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type,
+                cc, ce, mass, inertia, Qi, Qe, aux_acc):
+    """
+    Integration of the equations of motion using the generalized-alpha method.
 
-    return R0_c, A0_c, v0_c, w0_c, q_c, qd_c
+    Given:
+    time-step                           dt
+    state at time <t>                   R0, A0, v0, w0, q, qd, @ <t>
+    external forces and moments         Fe, Te, tau @ <t>
+    auxiliary acceleration              aux_acc
+
+    Returns:
+    state at time <t+dt>                R0, A0, v0, w0, q, qd, aux_acc @ <t+dt>
+    """
+    # Parameters
+    n_reps = 10
+    SpectralRadius = 1.0
+    alpha_m = (2.0 * SpectralRadius - 1.0) / (SpectralRadius + 1.0)
+    alpha_f = SpectralRadius / (SpectralRadius + 1.0)
+    beta = 0.25 * (1.0 - alpha_m + alpha_f) ** 2
+    gamma = 0.5 - alpha_m + alpha_f
+
+    # Accelerations
+    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB,
+                          j_type, cc, ce, mass, inertia, Qi, Qe)
+
+    Y = np.block([R0, dc2rpy(A0.T), q])
+    Yd = np.block([v0, w0, qd])
+    Ydd = np.block([vd0, wd0, qdd])
+    aux_acc_p = (alpha_f * Ydd - alpha_m * aux_acc) / (1.0 - alpha_m)
+
+    # Prediction
+    Ydd_p = Ydd
+    Yd_p = Yd + ((1.0 - gamma) * aux_acc + gamma * aux_acc_p) * dt
+    Y_p = Y + Yd * dt + ((0.5 - beta) * aux_acc + beta * aux_acc_p) * dt ** 2
+
+    # Correction
+    for i in range(n_reps):
+
+        # Accelerations using the predicted state
+        R0_p = Y_p[0:3]
+        A0_p = rpy2dc(Y_p[3:6]-Y[3:6]).T @ A0
+        q_p = Y_p[6:]
+        v0_p = Yd_p[0:3]
+        w0_p = Yd_p[3:6]
+        qd_p = Yd_p[6:]
+        vd0_p, wd0_p, qdd_p = f_dyn(R0_p, A0_p, v0_p, w0_p, q_p, qd_p, Fe, Te,
+                                    tau, SS, SE, BB, j_type, cc, ce, mass,
+                                    inertia, Qi, Qe)
+        aux_acc_p = (alpha_f * Ydd_p - alpha_m * aux_acc) / (1.0 - alpha_m)
+
+        # Corrected value
+        # Yd_p = Yd + ((1.0 - gamma) * aux_acc + gamma * aux_acc_p) * dt
+        # Y_p = Y + Yd * dt + ((0.5 - beta) * aux_acc + beta * aux_acc_p) * dt ** 2
+
+        Ydd_p = np.block([vd0_p, wd0_p, qdd_p])
+        Yd_p = Yd + ((1.0 - gamma) * Ydd + gamma * Ydd_p) * dt
+        Y_p = Y + dt * Yd + ((0.5 - beta) * Ydd + beta * Ydd_p) * dt ** 2
+
+    # Update values
+    R0_p = Y_p[0:3]
+    A0_p = rpy2dc(Y_p[3:6]-Y[3:6]).T @ A0
+    q_p = Y_p[6:]
+    v0_p = Yd_p[0:3]
+    w0_p = Yd_p[3:6]
+    qd_p = Yd_p[6:]
+    vd0_p, wd0_p, qdd_p = f_dyn(R0_p, A0_p, v0_p, w0_p, q_p, qd_p, Fe, Te,
+                                tau, SS, SE, BB, j_type, cc, ce, mass,
+                                inertia, Qi, Qe)
+    Ydd_p = np.block([vd0_p, wd0_p, qdd_p])
+    aux_acc = aux_acc_p + (1.0 - alpha_f) * Ydd_p / (1.0 - alpha_m)
+
+    return R0_p, A0_p, v0_p, w0_p, q_p, qd_p, aux_acc
 
 
 def f_dyn_rk(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc,

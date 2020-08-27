@@ -36,6 +36,7 @@ mass = 2.35
 inertia = mass * utils.inertia('none')
 cc = {1: [-0.15, 0.05, 0.0]}      # Leg connection
 foot = element.base(name=name, mass=mass, inertia=inertia, cc=cc)
+# foot = element.base(name=name, mass=mass, inertia=inertia)
 
 # 1 - Leg
 name = 'leg'
@@ -80,18 +81,17 @@ lowerArm = element.link(name=name, mass=mass, inertia=inertia, j_type=j_type,
                         Qi=Qi, cc=cc)
 
 # Endpoints
+
+# System
+name = 'simple robot'
+
 ee = {
     0: (3, [0.4, -0.05, 0.5], [0.0,  0.0, -pi/4], 'I'),
     1: (4, [0.15, 0.0,  1.0], [0.0, -pi/3, pi/2], 'I'),
     2: (0, [0.0,  0.0,  0.0], [0.0,  0.0,  0.0], 'I')
     }
-
-# System
-name = 'simple robot'
 bodies = [foot, leg, trunk, upperArm, lowerArm]
 robot = element.model(name=name, bodies=bodies, ee=ee, load='example')
-
-# Initial conditions
 R0 = np.array([1.0, 2.0, 3.0])
 Q0 = np.array([0.1, 0.2, 0.3])
 A0 = utils.rpy2dc(Q0).T
@@ -99,6 +99,21 @@ v0 = np.array([1.3, -2.2, 3.7])
 w0 = np.array([-0.2, 0.5, -0.4])
 q = np.array([0.1, 0.5, 1.0, 1.5])
 qd = np.array([-0.1, 0.2, -0.3, 0.4])
+
+# ee = {
+#     0: (0, [0.0, 0.0, 0.0], [0.0,  0.0, 0.0], 'I'),
+#     }
+# bodies = [foot]
+# robot = element.model(name=name, bodies=bodies, ee=ee, load='example')
+
+# R0 = np.array([0.0, 0.0, 0.0])
+# Q0 = np.array([0.0, 0.0, 0.0])
+# A0 = utils.rpy2dc(Q0).T
+# v0 = np.array([0.0, 0.0, 0.0])
+# w0 = np.array([0.0, 0.0, 0.0])
+# q = np.array([])
+# qd = np.array([])
+
 robot.set_init(R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
 
 # Simulate
@@ -107,7 +122,7 @@ tf = 1.0
 dt = 0.01
 rec = 0.1
 load = 'example'
-robot.simulate(ts=ts, tf=tf, dt=dt, rec=rec, load=load)
+robot.simulate(ts=ts, tf=tf, dt=dt, rec=rec, solver='al')
 
 aa = robot.res
 plt.subplot(221)
@@ -124,6 +139,7 @@ plt.plot(aa[:, 0], aa[:, 4])
 plt.grid(b=True)
 plt.show()
 
+print(aa[-1, 0])
 print(aa[-1, 1])
 print(aa[-1, 2])
 print(aa[-1, 3])

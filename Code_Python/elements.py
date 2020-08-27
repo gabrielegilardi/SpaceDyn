@@ -274,7 +274,7 @@ class model:
 
         return
 
-    def simulate(self, ts=0.0, tf=1.0, dt=0.001, rec=None, load=None):
+    def simulate(self, ts=0.0, tf=1.0, dt=0.001, rec=None, solver='nb'):
         """
         """
         R0 = self.R0
@@ -286,20 +286,42 @@ class model:
         n_steps = int(np.round((tf - ts) / dt)) + 1
         self.res = np.zeros([n_steps, 5])
 
+        Fe, Te, tau = user.calc_forces(ts, self.num_j, self.num_e, self.load)
+        vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
+                                self.SE, self.BB, self.j_type, self.cc, self.ce,
+                                self.mass, self.inertia, self.Qi, self.Qe)
+        aux_acc = np.block([vd0, wd0, qdd])
+
         self.res[0, 0] = ts
-        self.res[0, 1] = R0[0]
-        self.res[0, 2] = R0[1]
-        self.res[0, 3] = R0[2]
-        self.res[0, 4] = q[0]
+        self.res[0, 1] = q[0]
+        self.res[0, 2] = q[1]
+        self.res[0, 3] = dc2rpy(A0.T)[0]
+        self.res[0, 4] = q[2]
 
         for i in range(1, n_steps):
             t = ts + float(i) * dt
-            # print('time = ', t)
             Fe, Te, tau = user.calc_forces(t, self.num_j, self.num_e, self.load)
-            R0, A0, v0, w0, q, qd = \
-                dyn.f_dyn_rk(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
-                             self.SE, self.BB, self.j_type, self.cc, self.ce,
-                             self.mass, self.inertia, self.Qi, self.Qe)
+
+            # Solver using Runge-Kutta
+            if (solver == 'rk'):
+                R0, A0, v0, w0, q, qd = \
+                    dyn.f_dyn_rk(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
+                                self.SE, self.BB, self.j_type, self.cc, self.ce,
+                                self.mass, self.inertia, self.Qi, self.Qe)
+
+            # Solver using Newmark-beta
+            elif (solver == 'nb'):
+                R0, A0, v0, w0, q, qd = \
+                    dyn.f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
+                                 self.SE, self.BB, self.j_type, self.cc, self.ce,
+                                 self.mass, self.inertia, self.Qi, self.Qe)
+
+            # Solver using generalized-alpha
+            elif (solver == 'al'):
+                R0, A0, v0, w0, q, qd, aux_acc = \
+                    dyn.f_dyn_alpha(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
+                                 self.SE, self.BB, self.j_type, self.cc, self.ce,
+                                 self.mass, self.inertia, self.Qi, self.Qe, aux_acc)
 
             # Results
             vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
@@ -313,10 +335,10 @@ class model:
                                             self.qd, qdd, self.BB, self.j_type,
                                             self.cc)
             self.res[i, 0] = t
-            self.res[i, 1] = 0.0
-            self.res[i, 2] = 0.0
-            self.res[i, 3] = 0.0
-            self.res[i, 4] = 0.0
+            self.res[i, 1] = q[0]
+            self.res[i, 2] = q[1]
+            self.res[i, 3] = dc2rpy(A0.T)[0]
+            self.res[i, 4] = q[2]
 
     def set_init(self, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
                        w0=np.zeros(3), q=np.array([]), qd=np.array([])):
