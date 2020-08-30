@@ -99,22 +99,15 @@ v0 = np.array([1.3, -2.2, 3.7])
 w0 = np.array([-0.2, 0.5, -0.4])
 q = np.array([0.1, 0.5, 1.0, 1.5])
 qd = np.array([-0.1, 0.2, -0.3, 0.4])
+robot.set_init(R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
 
 # ee = {
 #     0: (0, [0.0, 0.0, 0.0], [0.0,  0.0, 0.0], 'I'),
 #     }
 # bodies = [foot]
 # robot = element.model(name=name, bodies=bodies, ee=ee, load='example')
+# robot.set_init()
 
-# R0 = np.array([0.0, 0.0, 0.0])
-# Q0 = np.array([0.0, 0.0, 0.0])
-# A0 = utils.rpy2dc(Q0).T
-# v0 = np.array([0.0, 0.0, 0.0])
-# w0 = np.array([0.0, 0.0, 0.0])
-# q = np.array([])
-# qd = np.array([])
-
-robot.set_init(R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
 
 # Simulate
 ts = 0.0
@@ -122,7 +115,7 @@ tf = 1.0
 dt = 0.01
 rec = 0.1
 load = 'example'
-robot.simulate(ts=ts, tf=tf, dt=dt, rec=rec, solver='al')
+robot.simulate(ts=ts, tf=tf, dt=dt, rec=rec, solver='rk')
 
 aa = robot.res
 plt.subplot(221)
@@ -139,8 +132,21 @@ plt.plot(aa[:, 0], aa[:, 4])
 plt.grid(b=True)
 plt.show()
 
-print(aa[-1, 0])
-print(aa[-1, 1])
-print(aa[-1, 2])
-print(aa[-1, 3])
-print(aa[-1, 4])
+print('time = ', aa[-1, 0])
+print('R0[2] = ', aa[-1, 1])
+print('q[2] = ', aa[-1, 2])
+print('Q[0] = ', aa[-1, 3])
+print('qd[0] = ', aa[-1, 4])
+print('CoM acc = ', robot.calc_CoM()[2])
+print('Kin Ene = ', robot.calc_kin_ener()[0])
+print('Pot Ene = ', robot.calc_pot_ener()[0])
+print('Lin Mom = ', robot.calc_lin_mom()[0])
+print('Ang Mom = ', robot.calc_ang_mom1()[0])
+
+tot = aa[-1, 0] + aa[-1, 1] + aa[-1, 2] + aa[-1, 3] + aa[-1, 4] \
+      + (robot.calc_CoM()[2]).sum() + robot.calc_kin_ener()[0] \
+      + robot.calc_pot_ener()[0] + (robot.calc_lin_mom()[0]).sum() \
+      + (robot.calc_ang_mom1()[0]).sum()
+print('tot = ', tot)
+
+# robot.info()

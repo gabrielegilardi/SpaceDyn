@@ -15,8 +15,7 @@ import kinematics as kin
 from utils import cross, rotW, tilde, rpy2dc, dc2rpy
 
 
-def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
-         ce, mass, inertia, Qe):
+def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, Conn, Prop):
     """
     Inverse dynamics computation by the recursive Newton-Euler method
     (eqs. 3.30-3.39).
@@ -32,6 +31,9 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
     i.e. the system reaction force <F0> and moment <T0> on the base, and the 
     torque/forces <tau> on the joints.
     """
+    SS, SE, j_type = [Conn[i] for i in (0, 1, 3)]
+    mass, inertia, cc, ce, Qe = [Prop[i] for i in (0, 1, 2, 3, 5)]
+
     num_j = len(q)              # Number of joints/links
     num_b = num_j + 1           # Number of bodies
     num_e = SE.shape[1]         # Number of endpoints
@@ -39,10 +41,10 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
     Gravity = np.array([0.0, 0.0, -9.81])       # Gravity vector
 
     # Linear and angular velocities of all bodies
-    vv, ww = kin.calc_vel(AA, v0, w0, q, qd, BB, j_type, cc)
+    vv, ww = kin.calc_vel(AA, v0, w0, q, qd, Conn, Prop)
 
     # Linear and angular accelerations of all bodies
-    vd, wd = kin.calc_acc(AA, ww, vd0, wd0, q, qd, qdd, BB, j_type, cc)
+    vd, wd = kin.calc_acc(AA, ww, vd0, wd0, q, qd, qdd, Conn, Prop)
 
     # Inertial forces and moments on the body centroids (for convenience the
     # the gravitational force is also included here) - eqs. 3.30-3.31
@@ -180,8 +182,7 @@ def r_ne(RR, AA, v0, w0, q, qd, vd0, wd0, qdd, Fe, Te, SS, SE, BB, j_type, cc,
     return Force
 
 
-def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce,
-          mass, inertia, Qi, Qe):
+def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, Conn, Prop):
     """
     Forward dynamics computation (chapter 3.6).
 
@@ -194,28 +195,29 @@ def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce,
 
     i.e. the system linear and angular accelerations (base + joints).
     """
+    SE = Conn[1]
+    ce, Qe = [Prop[i] for i in (3, 5)]
+
     num_j = len(q)                              # Number of joints/links
-    num_b = num_j + 1                           # Number of bodies
     num_e = SE.shape[1]                         # Number of endpoints
     Ez = np.array([0.0, 0.0, 1.0])              # Joint axis direction
-    Force = np.zeros(6+num_j)
 
     # Rotation matrices
-    AA = kin.calc_aa(A0, q, BB, j_type, Qi)
+    AA = kin.calc_aa(A0, q, Conn, Prop)
 
     # Position vectors
-    RR = kin.calc_pos(R0, AA, q, BB, j_type, cc)
+    RR = kin.calc_pos(R0, AA, q, Conn, Prop)
 
     # Inertia matrice
-    HH = kin.calc_hh(RR, AA, mass, inertia, BB, j_type, cc)
+    HH = kin.calc_hh(RR, AA, Conn, Prop)
 
-    # Calculation of velocty dependent terms using the recursive Newton-Eulero
+    # Calculation of velocity dependent terms using the recursive Newton-Eulero
     # inverse dynamics setting to zero all accelerations and forces
     zero_acc = np.zeros(3)
     zero_qdd = np.zeros(num_j)
     zero_Fe = np.zeros((3, num_e))
     Force0 = r_ne(RR, AA, v0, w0, q, qd, zero_acc, zero_acc, zero_qdd, zero_Fe,
-                  zero_Fe, SS, SE, BB, j_type, cc, ce, mass, inertia, Qe)
+                  zero_Fe, Conn, Prop)
 
     # Generalized external forces applied on base centroid and joints
     F0 = np.zeros(3)
@@ -242,6 +244,7 @@ def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce,
                 F0 += Fe[:, ie]
                 T0 += (tilde(R_0_ie) @ Fe[:, ie] + Te[:, ie])
 
+    # Assemble all terms
     Force = np.block([F0, T0, tau])
 
     # Generalized external forces applied to the link endpoints
@@ -257,12 +260,8 @@ def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce,
         # If the endpoint is associated with a link
         if (i > 0):
 
-            # Link sequence
-            seq_link = kin.j_num(i, BB)
-
             # Endpoint Jacobian - shape is (6 x num_j)
-            JJ_tmp = kin.calc_je(RR, AA, q, seq_link, j_type, cc, ce[:, ie],
-                                 Qe[:, ie])
+            JJ_tmp = kin.calc_je(ie, RR, AA, q, Conn, Prop)
             JJ_tx_i = JJ_tmp[0:3, :]        # Translational component
             JJ_rx_i = JJ_tmp[3:6, :]        # Rotational component
 
@@ -297,8 +296,7 @@ def f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc, ce,
     return vd0, wd0, qdd
 
 
-def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc,
-             ce, mass, inertia, Qi, Qe):
+def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, Conn, Prop):
     """
     Integration of the equations of motion using the Newmark-beta method and
     the Rodrigues formula to update the rotations.
@@ -324,8 +322,7 @@ def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc,
     gamma = 0.5
 
     # Accelerations
-    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB,
-                          j_type, cc, ce, mass, inertia, Qi, Qe)
+    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, Conn, Prop)
 
     # Prediction (assume acc_p = acc)
     v0_p = v0 + vd0 * dt
@@ -341,8 +338,7 @@ def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc,
 
         # Accelerations using the predicted state
         vd0_p, wd0_p, qdd_p = f_dyn(R0_p, A0_p, v0_p, w0_p, q_p, qd_p, Fe, Te,
-                                    tau, SS, SE, BB, j_type, cc, ce, mass,
-                                    inertia, Qi, Qe)
+                                    tau, Conn, Prop)
 
         # Corrected value
         v0_p = v0 + ((1.0 - gamma) * vd0 + gamma * vd0_p) * dt
@@ -356,8 +352,7 @@ def f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc,
     return R0_p, A0_p, v0_p, w0_p, q_p, qd_p
 
 
-def f_dyn_alpha(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type,
-                cc, ce, mass, inertia, Qi, Qe, aux_acc):
+def f_dyn_alpha(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, Conn, Prop, aux_acc):
     """
     Integration of the equations of motion using the generalized-alpha method.
 
@@ -379,8 +374,7 @@ def f_dyn_alpha(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type,
     gamma = 0.5 - alpha_m + alpha_f
 
     # Accelerations
-    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB,
-                          j_type, cc, ce, mass, inertia, Qi, Qe)
+    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, Conn, Prop)
 
     Y = np.block([R0, dc2rpy(A0.T), q])
     Yd = np.block([v0, w0, qd])
@@ -403,8 +397,7 @@ def f_dyn_alpha(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type,
         w0_p = Yd_p[3:6]
         qd_p = Yd_p[6:]
         vd0_p, wd0_p, qdd_p = f_dyn(R0_p, A0_p, v0_p, w0_p, q_p, qd_p, Fe, Te,
-                                    tau, SS, SE, BB, j_type, cc, ce, mass,
-                                    inertia, Qi, Qe)
+                                    tau, Conn, Prop)
         aux_acc_p = (alpha_f * Ydd_p - alpha_m * aux_acc) / (1.0 - alpha_m)
 
         # Corrected value
@@ -423,16 +416,14 @@ def f_dyn_alpha(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type,
     w0_p = Yd_p[3:6]
     qd_p = Yd_p[6:]
     vd0_p, wd0_p, qdd_p = f_dyn(R0_p, A0_p, v0_p, w0_p, q_p, qd_p, Fe, Te,
-                                tau, SS, SE, BB, j_type, cc, ce, mass,
-                                inertia, Qi, Qe)
+                                tau, Conn, Prop)
     Ydd_p = np.block([vd0_p, wd0_p, qdd_p])
     aux_acc = aux_acc_p + (1.0 - alpha_f) * Ydd_p / (1.0 - alpha_m)
 
     return R0_p, A0_p, v0_p, w0_p, q_p, qd_p, aux_acc
 
 
-def f_dyn_rk(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc,
-             ce, mass, inertia, Qi, Qe):
+def f_dyn_rk(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, Conn, Prop):
     """
     Integration of the equations of motion using the Runge-Kutta method and
     the Rodrigues formula to update the rotations.
@@ -446,86 +437,62 @@ def f_dyn_rk(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB, j_type, cc,
     state at time <t+dt>                R0, A0, v0, w0, q, qd, at <t+dt>
     """
     # 1st step
+    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, Conn, Prop)
 
-    # Accelerations using the current state
-    vd0, wd0, qdd = f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, SS, SE, BB,
-                          j_type, cc, ce, mass, inertia, Qi, Qe)
-
-    # Predicted values for v0 and R0
     v0_s1 = vd0 * dt
     R0_s1 = v0 * dt
-
-    # Predict values for w0 and A0
     w0_s1 = wd0 * dt
     A0_s1 = rotW(w0, dt) @ A0 - A0
-
-    # Predicted values for qd and q
+    # Q0 = dc2rpy(A0.T)
+    # Q0_s1 = w0 * dt
+    # A0_s1 = rpy2dc(Q0 + Q0_s1).T
     qd_s1 = qdd * dt
-    q_s1 = qd * dt
+    q_s1  = qd * dt
 
     # 2nd Step
-
-    # Accelerations using the state predicted by the 1st step
     vd0, wd0, qdd = f_dyn(R0 + R0_s1 / 2.0, A0 + A0_s1 / 2.0, v0 + v0_s1 / 2.0,
                           w0 + w0_s1 / 2.0, q + q_s1 / 2.0, qd + qd_s1 / 2.0,
-                          Fe, Te, tau, SS, SE, BB, j_type, cc, ce, mass,
-                          inertia, Qi, Qe)
-
-    # Predicted values for v0 and R0
+                          Fe, Te, tau, Conn, Prop)
     v0_s2 = vd0 * dt
     R0_s2 = (v0 + v0_s1 / 2.0) * dt
-
-    # Predict values for w0 and A0
     w0_s2 = wd0 * dt
     A0_s2 = rotW(w0 + w0_s1 / 2.0, dt) @ A0 - A0
-
-    # Predicted values for qd and q
+    # Q0_s2 = (w0 + w0_s1 / 2.0) * dt
+    # A0_s2 = rpy2dc(Q0 + Q0_s2).T
     qd_s2 = qdd * dt
-    q_s2 = (qd + qd_s1 / 2.0) * dt
+    q_s2  = (qd + qd_s1 / 2.0) * dt
 
     # 3rd Step
-
-    # Accelerations using the state predicted by the 2nd step
     vd0, wd0, qdd = f_dyn(R0 + R0_s2 / 2.0, A0 + A0_s2 / 2.0, v0 + v0_s2 / 2.0,
                           w0 + w0_s2 / 2.0, q + q_s2 / 2.0, qd + qd_s2 / 2.0,
-                          Fe, Te, tau, SS, SE, BB, j_type, cc, ce, mass,
-                          inertia, Qi, Qe)
-
-    # Predicted values for v0 and R0
+                          Fe, Te, tau, Conn, Prop)
     v0_s3 = vd0 * dt
     R0_s3 = (v0 + v0_s2 / 2.0) * dt
-
-    # Predict values for w0 and A0
     w0_s3 = wd0 * dt
     A0_s3 = rotW(w0 + w0_s2 / 2.0, dt) @ A0 - A0
-
-    # Predicted values for qd and q
+    # Q0_s3 = (w0 + w0_s2 / 2.0) * dt
+    # A0_s3 = rpy2dc(Q0 + Q0_s3).T
     qd_s3 = qdd * dt
-    q_s3 = (qd + qd_s2 / 2.0) * dt
+    q_s3  = (qd + qd_s2 / 2.0) * dt
 
     # 4th Step
-
-    # Accelerations using the state predicted by the 3rd step
     vd0, wd0, qdd = f_dyn(R0 + R0_s3, A0 + A0_s3, v0 + v0_s3, w0 + w0_s3,
-                          q + q_s3, qd + qd_s3, Fe, Te, tau, SS, SE, BB,
-                          j_type, cc, ce, mass, inertia, Qi, Qe)
-
-    # Predicted values for v0 and R0
+                          q + q_s3, qd + qd_s3, Fe, Te, tau, Conn, Prop)
     v0_s4 = vd0 * dt
     R0_s4 = (v0 + v0_s3) * dt
-
-    # Predict values for w0 and A0
     w0_s4 = wd0 * dt
     A0_s4 = rotW(w0 + w0_s3, dt) @ A0 - A0
-
-    # Predicted values for qd and q
+    # Q0_s4 = (w0 + w0_s3) * dt
+    # A0_s4 = rpy2dc(Q0 + Q0_s4).T
     qd_s4 = qdd * dt
-    q_s4 = (qd + qd_s3) * dt
+    q_s4  = (qd + qd_s3) * dt
 
     # Predicted values for the next step
     R0_p = R0 + (R0_s1 + 2.0 * R0_s2 + 2.0 * R0_s3 + R0_s4) / 6.0
     A0_p = A0 + (A0_s1 + 2.0 * A0_s2 + 2.0 * A0_s3 + A0_s4) / 6.0
-    q_p = q + (q_s1 + 2.0 * q_s2 + 2.0 * q_s3 + q_s4) / 6.0
+    # Q0_p = Q0 + (Q0_s1 + 2.0 * Q0_s2 + 2.0 * Q0_s3 + Q0_s4) / 6.0
+    # A0_p = rpy2dc(Q0_p).T
+    q_p  = q  + (q_s1  + 2.0 * q_s2  + 2.0 * q_s3  + q_s4)  / 6.0
     v0_p = v0 + (v0_s1 + 2.0 * v0_s2 + 2.0 * v0_s3 + v0_s4) / 6.0
     w0_p = w0 + (w0_s1 + 2.0 * w0_s2 + 2.0 * w0_s3 + w0_s4) / 6.0
     qd_p = qd + (qd_s1 + 2.0 * qd_s2 + 2.0 * qd_s3 + qd_s4) / 6.0

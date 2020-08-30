@@ -232,113 +232,38 @@ class model:
         self.num_e = len(self.ee)
 
         # Connectivity
-        self.SS, self.SE, self.BB = connectivity(self.bodies, self.ee)
+        SS, SE, BB = connectivity(self.bodies, self.ee)
 
         # Links and endpoints relative positions/orientations
-        self.cc, self.Qi = build_cc_Qi(self.bodies)
-        self.ce, self.Qe = build_ce_Qe(self.ee)
+        cc, Qi = build_cc_Qi(self.bodies)
+        ce, Qe = build_ce_Qe(self.ee)
 
         # Properties
-        self.mass, self.inertia = build_mass_inertia(self.bodies)
-        self.j_type = build_j_type(self.joints)
+        mass, inertia = build_mass_inertia(self.bodies)
+        j_type = build_j_type(self.joints)
+
+        self.Conn = [SS, SE, BB, j_type]                # Connectivity list
+        self.Prop = [mass, inertia, cc, ce, Qi, Qe]     # Property list
 
     def info(self):
         """
         """
+        names_Conn = ['SS', 'SE', 'BB', 'j_type']
+        names_Prop = ['mass', 'inertia', 'cc', 'ce', 'Qi', 'Qe']
+
         print()
-        print('MODEL')
         print('Name = ', self.name)
         print('Number of bodies = ', self.num_b)
         print('Number of joints = ', self.num_j)
         print('Number of endpoints = ', self.num_e)
-        print()
-        print('CONNECTIVITY')
-        print('SS =')
-        print(self.SS)
-        print('SE = ', self.SE)
-        print('BB = ', self.BB)
-        print('joint type = ', self.j_type)
-        print()
-        print('PROPERTIES')
-        print('Mass = ', self.mass)
-        print('Inertia =')
-        print(self.inertia)
-        print('Body-to-body connections =')
-        print(self.cc)
-        print('Body orientations =')
-        print(self.Qi)
-        print('Body-to-endpoint connections =')
-        print(self.ce)
-        print('Endpoint orientations =')
-        print(self.Qe)
 
-        return
+        for i in range(len(names_Conn)):
+            print('\n', names_Conn[i], ' = ')
+            print(self.Conn[i])
 
-    def simulate(self, ts=0.0, tf=1.0, dt=0.001, rec=None, solver='nb'):
-        """
-        """
-        R0 = self.R0
-        A0 = self.A0
-        v0 = self.v0
-        w0 = self.w0
-        q = self.q
-        qd = self.qd
-        n_steps = int(np.round((tf - ts) / dt)) + 1
-        self.res = np.zeros([n_steps, 5])
-
-        Fe, Te, tau = user.calc_forces(ts, self.num_j, self.num_e, self.load)
-        vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
-                                self.SE, self.BB, self.j_type, self.cc, self.ce,
-                                self.mass, self.inertia, self.Qi, self.Qe)
-        aux_acc = np.block([vd0, wd0, qdd])
-
-        self.res[0, 0] = ts
-        self.res[0, 1] = q[0]
-        self.res[0, 2] = q[1]
-        self.res[0, 3] = dc2rpy(A0.T)[0]
-        self.res[0, 4] = q[2]
-
-        for i in range(1, n_steps):
-            t = ts + float(i) * dt
-            Fe, Te, tau = user.calc_forces(t, self.num_j, self.num_e, self.load)
-
-            # Solver using Runge-Kutta
-            if (solver == 'rk'):
-                R0, A0, v0, w0, q, qd = \
-                    dyn.f_dyn_rk(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
-                                self.SE, self.BB, self.j_type, self.cc, self.ce,
-                                self.mass, self.inertia, self.Qi, self.Qe)
-
-            # Solver using Newmark-beta
-            elif (solver == 'nb'):
-                R0, A0, v0, w0, q, qd = \
-                    dyn.f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
-                                 self.SE, self.BB, self.j_type, self.cc, self.ce,
-                                 self.mass, self.inertia, self.Qi, self.Qe)
-
-            # Solver using generalized-alpha
-            elif (solver == 'al'):
-                R0, A0, v0, w0, q, qd, aux_acc = \
-                    dyn.f_dyn_alpha(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
-                                 self.SE, self.BB, self.j_type, self.cc, self.ce,
-                                 self.mass, self.inertia, self.Qi, self.Qe, aux_acc)
-
-            # Results
-            vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, self.SS,
-                                    self.SE, self.BB, self.j_type, self.cc, self.ce,
-                                    self.mass, self.inertia, self.Qi, self.Qe)
-            self.AA = kin.calc_aa(A0, q, self.BB, self.j_type, self.Qi)
-            self.RR = kin.calc_pos(R0, self.AA, q, self.BB, self.j_type, self.cc)
-            self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
-                                            self.BB, self.j_type, self.cc)
-            self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
-                                            self.qd, qdd, self.BB, self.j_type,
-                                            self.cc)
-            self.res[i, 0] = t
-            self.res[i, 1] = q[0]
-            self.res[i, 2] = q[1]
-            self.res[i, 3] = dc2rpy(A0.T)[0]
-            self.res[i, 4] = q[2]
+        for i in range(len(names_Prop)):
+            print('\n', names_Prop[i], ' = ')
+            print(self.Prop[i])
 
     def set_init(self, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
                        w0=np.zeros(3), q=np.array([]), qd=np.array([])):
@@ -347,6 +272,13 @@ class model:
 
         Note: the zero refer to the base not to the time.
         """
+# Param: gravity, ... integrators parameters ..., other
+# State: RR, AA, vv, ww, vd, wd.
+# Load: Fe, Te, tau
+# Y = R0, A0/Q0, q
+# Yd = v0, w0, qd
+# Ydd = vd0, wd0, qdd
+
         # Base (position, orientation, and velocities)
         self.R0 = np.asarray(R0)
         self.A0 = np.asarray(A0)
@@ -362,40 +294,98 @@ class model:
             self.qd = np.zeros(self.num_j)
 
         # # Rotation matrices (link and joint frame are parallel)
-        # self.AA = kin.calc_aa(A0, self.q, self.BB, self.j_type, self.Qi)
+        # self.AA = kin.calc_aa(A0, self.q, self.Conn, self.Prop)
 
         # # Centroid positions
-        # self.RR = kin.calc_pos(R0, self.AA, self.q, self.BB, self.j_type,
-        #                        self.cc)
+        # self.RR = kin.calc_pos(R0, self.AA, self.q, self.Conn, self.Prop)
 
         # # Centroid linear and angular velocities
         # self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
-        #                                 self.BB, self.j_type, self.cc)
+        #                                 self.Conn, self.Prop)
 
         # # External forces
         # Fe, Te, tau = user.calc_forces(t0, self.num_j, self.num_e, self.load)
 
         # # Forward dynamics
         # vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, self.q, self.qd, Fe, Te,
-        #                           tau, self.SS, self.SE, self.BB, self.j_type,
-        #                           self.cc, self.ce, self.mass, self.inertia,
-        #                           self.Qi, self.Qe)
+        #                           tau, self.Conn, self.Prop)
 
         # # Centroid linear and angular accelerations
         # self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
-        #                                 self.qd, qdd, self.BB, self.j_type,
-        #                                 self.cc)
+        #                                 self.qd, qdd, self.Conn, self.Prop)
+
+    def simulate(self, ts=0.0, tf=1.0, dt=0.001, rec=None, solver='nb'):
+        """
+        """
+        R0 = self.R0
+        A0 = self.A0
+        v0 = self.v0
+        w0 = self.w0
+        q = self.q
+        qd = self.qd
+        n_steps = int(np.round((tf - ts) / dt)) + 1
+        self.res = np.zeros([n_steps, 5])
+
+        Fe, Te, tau = user.calc_forces(ts, self.num_j, self.num_e, self.load)
+        vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau,
+                                  self.Conn, self.Prop)
+        aux_acc = np.block([vd0, wd0, qdd])
+
+        self.res[0, 0] = ts
+        self.res[0, 1] = R0[2]
+        self.res[0, 2] = q[2]
+        self.res[0, 3] = dc2rpy(A0.T)[0]
+        self.res[0, 4] = qd[0]
+
+        for i in range(1, n_steps):
+            t = ts + float(i) * dt
+            Fe, Te, tau = user.calc_forces(t, self.num_j, self.num_e, self.load)
+
+            # Solver using Runge-Kutta
+            if (solver == 'rk'):
+                R0, A0, v0, w0, q, qd = \
+                    dyn.f_dyn_rk(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau,
+                                 self.Conn, self.Prop)
+
+            # Solver using Newmark-beta
+            elif (solver == 'nb'):
+                R0, A0, v0, w0, q, qd = \
+                    dyn.f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau,
+                                 self.Conn, self.Prop)
+
+            # Solver using generalized-alpha
+            elif (solver == 'al'):
+                R0, A0, v0, w0, q, qd, aux_acc = \
+                    dyn.f_dyn_alpha(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau,
+                                    self.Conn, self.Prop, aux_acc)
+
+            # Results (put in a separate function)
+            vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau,
+                                      self.Conn, self.Prop)
+
+            self.AA = kin.calc_aa(A0, q, self.Conn, self.Prop)
+            self.RR = kin.calc_pos(R0, self.AA, q, self.Conn, self.Prop)
+            self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
+                                            self.Conn, self.Prop)
+            self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
+                                            self.qd, qdd, self.Conn, self.Prop)
+            self.res[i, 0] = t
+            self.res[i, 1] = R0[2]
+            self.res[i, 2] = q[2]
+            self.res[i, 3] = dc2rpy(A0.T)[0]
+            self.res[i, 4] = qd[0]
 
     def calc_CoM(self):
         """
         Returns position, velocity, and acceleration of the system center of
         mass (CoM).
         """
-        mt = self.mass.sum()
+        mass = self.Prop[0]
 
-        RR_com = (self.RR * self.mass).sum(axis=1) / mt
-        vv_com = (self.vv * self.mass).sum(axis=1) / mt
-        vd_com = (self.vd * self.mass).sum(axis=1) / mt
+        mt = mass.sum()
+        RR_com = (self.RR * mass).sum(axis=1) / mt
+        vv_com = (self.vv * mass).sum(axis=1) / mt
+        vd_com = (self.vd * mass).sum(axis=1) / mt
 
         return RR_com, vv_com, vd_com
 
@@ -403,11 +393,14 @@ class model:
         """
         Returns the kinetic energy for the entire system and for each body.
         """
+        mass = self.Prop[0]
+        inertia = self.Prop[1]
+
         TK = np.zeros(self.num_b)
         for i in range(self.num_b):
             AA = self.AA[:, 3*i:3*(i+1)]
-            In = AA @ self.inertia[:, 3*i:3*(i+1)] @ AA.T
-            TK[i] = self.mass[i] * (self.vv[:, i].T @ self.vv[:, i]) / 2.0 \
+            In = AA @ inertia[:, 3*i:3*(i+1)] @ AA.T
+            TK[i] = mass[i] * (self.vv[:, i].T @ self.vv[:, i]) / 2.0 \
                     + self.ww[:, i].T @ In @ self.ww[:, i] / 2.0
 
         return TK.sum(), TK
@@ -416,9 +409,10 @@ class model:
         """
         Returns the potential energy for the entire system and for each body.
         """
-        Gravity = np.array([0.0, 0.0, -9.81])       # Gravity vector
+        mass = self.Prop[0]
 
-        VG = - self.mass * (Gravity.T @ self.RR)
+        Gravity = np.array([0.0, 0.0, -9.81])       # Gravity vector
+        VG = - mass * (Gravity.T @ self.RR)
 
         return VG.sum(), VG
 
@@ -450,7 +444,9 @@ class model:
         """
         Returns the linear momentum for the entire system and for each body.
         """
-        LM = self.mass * self.vv
+        mass = self.Prop[0]
+
+        LM = mass * self.vv
 
         return LM.sum(axis=1), LM
 
@@ -459,7 +455,9 @@ class model:
         Returns the derivative of the linear momentum for the entire system and
         for each body.
         """
-        LM1 = self.mass * self.vd
+        mass = self.Prop[0]
+
+        LM1 = mass * self.vd
 
         return LM1.sum(axis=1), LM1
 
@@ -468,12 +466,15 @@ class model:
         Returns the angular momentum for the entire system and for each body
         with respect to point P_ref.
         """
+        mass = self.Prop[0]
+        inertia = self.Prop[1]
+
         HM = np.zeros((3, self.num_b))
         for i in range(self.num_b):
             AA = self.AA[:, 3*i:3*(i+1)]
-            In = AA @ self.inertia[:, 3*i:3*(i+1)] @ AA.T
-            HM[:, i] = cross(self.RR[:, i] - P_ref,
-                       self.mass[i] * self.vv[:, i]) + In @ self.ww[:, i]
+            In = AA @ inertia[:, 3*i:3*(i+1)] @ AA.T
+            HM[:, i] = cross(self.RR[:, i] - P_ref, mass[i] * self.vv[:, i]) \
+                       + In @ self.ww[:, i]
 
         return HM.sum(axis=1), HM
 
@@ -482,13 +483,16 @@ class model:
         Returns the derivative of the angular momentum for the entire system
         and for each body with respect to point P_ref and velocity V_ref.
         """
+        mass = self.Prop[0]
+        inertia = self.Prop[1]
+
         HM = np.zeros((3, self.num_b))
         for i in range(self.num_b):
             AA = self.AA[:, 3*i:3*(i+1)]
-            In = AA @ self.inertia[:, 3*i:3*(i+1)] @ AA.T
+            In = AA @ inertia[:, 3*i:3*(i+1)] @ AA.T
             HM[:, i] = In @ self.wd[:, i] \
                 + cross(self.ww[:, i], In @ self.ww[:, i]) \
-                + cross(self.RR[:, i] - P_ref, self.mass[i] * self.vd[:, i]) \
-                + cross(self.vv[:, i] - V_ref, self.mass[i] * self.vv[:, i])
+                + cross(self.RR[:, i] - P_ref, mass[i] * self.vd[:, i]) \
+                + cross(self.vv[:, i] - V_ref, mass[i] * self.vv[:, i])
 
         return HM.sum(axis=1), HM
