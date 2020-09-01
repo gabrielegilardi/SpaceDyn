@@ -244,6 +244,8 @@ class model:
 
         self.Conn = [SS, SE, BB, j_type]                # Connectivity list
         self.Prop = [mass, inertia, cc, ce, Qi, Qe]     # Property list
+        self.Y = np.zeros(6+self.num_j)                 # State variables
+        self.Yd = np.zeros(6+self.num_j)                # State velocities
 
     def info(self):
         """
@@ -265,8 +267,9 @@ class model:
             print('\n', names_Prop[i], ' = ')
             print(self.Prop[i])
 
-    def set_init(self, R0=np.zeros(3), A0=np.eye(3), v0=np.zeros(3),
-                       w0=np.zeros(3), q=np.array([]), qd=np.array([])):
+
+    def set_init(self, R0=np.zeros(3), Q0=np.zeros(3), v0=np.zeros(3),
+                 w0=np.zeros(3), q=np.array([]), qd=np.array([])):
         """
         Initializes quantities at the starting time.
 
@@ -275,67 +278,59 @@ class model:
 # Param: gravity, ... integrators parameters ..., other
 # State: RR, AA, vv, ww, vd, wd.
 # Load: Fe, Te, tau
-# Y = R0, A0/Q0, q
-# Yd = v0, w0, qd
 # Ydd = vd0, wd0, qdd
-
-        # Base (position, orientation, and velocities)
-        self.R0 = np.asarray(R0)
-        self.A0 = np.asarray(A0)
-        self.v0 = np.asarray(v0)
-        self.w0 = np.asarray(w0)
+        
+        self.Y[0:3] = np.asarray(R0)
+        self.Y[3:6] = np.asarray(Q0)
         if (len(q) > 0):
-            self.q = q
-        else:
-            self.q = np.zeros(self.num_j)
-        if (len(qd)):
-            self.qd = qd
-        else:
-            self.qd = np.zeros(self.num_j)
+            self.Y[6:] = q
+
+        self.Yd[0:3] = np.asarray(v0)
+        self.Yd[3:6] = np.asarray(w0)
+        if (len(q) > 0):
+            self.Yd[6:] = qd
 
         # # Rotation matrices (link and joint frame are parallel)
-        # self.AA = kin.calc_aa(A0, self.q, self.Conn, self.Prop)
+        # AA = kin.calc_aa(Q0, q, self.Conn, self.Prop)
 
         # # Centroid positions
-        # self.RR = kin.calc_pos(R0, self.AA, self.q, self.Conn, self.Prop)
+        # RR = kin.calc_pos(R0, AA, q, self.Conn, self.Prop)
 
         # # Centroid linear and angular velocities
-        # self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
-        #                                 self.Conn, self.Prop)
+        # vv, ww = kin.calc_vel(AA, v0, w0, q, qd, self.Conn, self.Prop)
 
         # # External forces
         # Fe, Te, tau = user.calc_forces(t0, self.num_j, self.num_e, self.load)
 
         # # Forward dynamics
-        # vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, self.q, self.qd, Fe, Te,
-        #                           tau, self.Conn, self.Prop)
+        # vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, self.Conn, self.Prop)
 
         # # Centroid linear and angular accelerations
-        # self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
-        #                                 self.qd, qdd, self.Conn, self.Prop)
+        # vd, wd = kin.calc_acc(AA, ww, vd0, wd0, q, qd, qdd, self.Conn, self.Prop)
 
     def simulate(self, ts=0.0, tf=1.0, dt=0.001, rec=None, solver='nb'):
         """
         """
-        R0 = self.R0
-        A0 = self.A0
-        v0 = self.v0
-        w0 = self.w0
-        q = self.q
-        qd = self.qd
         n_steps = int(np.round((tf - ts) / dt)) + 1
         self.res = np.zeros([n_steps, 5])
 
         Fe, Te, tau = user.calc_forces(ts, self.num_j, self.num_e, self.load)
-        vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau,
-                                  self.Conn, self.Prop)
-        aux_acc = np.block([vd0, wd0, qdd])
+        Ydd = dyn.f_dyn(self.Y, self.Yd, Fe, Te, tau, self.Conn, self.Prop)
 
-        self.res[0, 0] = ts
-        self.res[0, 1] = R0[2]
-        self.res[0, 2] = q[2]
-        self.res[0, 3] = dc2rpy(A0.T)[0]
-        self.res[0, 4] = qd[0]
+        self.results(ts)
+        i = 0
+        self.res[i, 0] = ts
+
+        if (self.load == 'base_only'):
+            self.res[i, 1] = self.Y[2]
+            self.res[i, 2] = self.Y[5]
+            self.res[i, 3] = self.Yd[2]
+            self.res[i, 4] = self.Yd[5]
+        else:
+            self.res[i, 1] = self.Y[2]
+            self.res[i, 2] = self.Y[8]
+            self.res[i, 3] = self.Y[3]
+            self.res[i, 4] = self.Yd[6]
 
         for i in range(1, n_steps):
             t = ts + float(i) * dt
@@ -343,37 +338,44 @@ class model:
 
             # Solver using Runge-Kutta
             if (solver == 'rk'):
-                R0, A0, v0, w0, q, qd = \
-                    dyn.f_dyn_rk(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau,
-                                 self.Conn, self.Prop)
+                self.Y, self.Yd = dyn.f_dyn_rk(dt, self.Y, self.Yd, Fe, Te, tau,
+                                               self.Conn, self.Prop)
 
             # Solver using Newmark-beta
             elif (solver == 'nb'):
-                R0, A0, v0, w0, q, qd = \
-                    dyn.f_dyn_nb(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau,
-                                 self.Conn, self.Prop)
-
-            # Solver using generalized-alpha
-            elif (solver == 'al'):
-                R0, A0, v0, w0, q, qd, aux_acc = \
-                    dyn.f_dyn_alpha(dt, R0, A0, v0, w0, q, qd, Fe, Te, tau,
-                                    self.Conn, self.Prop, aux_acc)
+                self.Y, self.Yd = dyn.f_dyn_nb(dt, self.Y, self.Yd, Fe, Te, tau,
+                                               self.Conn, self.Prop)
 
             # Results (put in a separate function)
-            vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau,
-                                      self.Conn, self.Prop)
-
-            self.AA = kin.calc_aa(A0, q, self.Conn, self.Prop)
-            self.RR = kin.calc_pos(R0, self.AA, q, self.Conn, self.Prop)
-            self.vv, self.ww = kin.calc_vel(self.AA, v0, w0, self.q, self.qd,
-                                            self.Conn, self.Prop)
-            self.vd, self.wd = kin.calc_acc(self.AA, self.ww, vd0, wd0, self.q,
-                                            self.qd, qdd, self.Conn, self.Prop)
             self.res[i, 0] = t
-            self.res[i, 1] = R0[2]
-            self.res[i, 2] = q[2]
-            self.res[i, 3] = dc2rpy(A0.T)[0]
-            self.res[i, 4] = qd[0]
+
+            if (self.load == 'base_only'):
+                self.res[i, 1] = self.Y[2]
+                self.res[i, 2] = self.Y[5]
+                self.res[i, 3] = self.Yd[2]
+                self.res[i, 4] = self.Yd[5]
+            else:
+                self.res[i, 1] = self.Y[2]
+                self.res[i, 2] = self.Y[8]
+                self.res[i, 3] = self.Y[3]
+                self.res[i, 4] = self.Yd[6]
+
+        self.results(t)
+
+
+    def results(self, t):
+        """
+        """
+        R0, Q0, q = self.Y[0:3], self.Y[3:6], self.Y[6:]
+        qd = self.Yd[6:]
+
+        Fe, Te, tau = user.calc_forces(t, self.num_j, self.num_e, self.load)
+        Ydd = dyn.f_dyn(self.Y, self.Yd, Fe, Te, tau, self.Conn, self.Prop)
+
+        self.AA = kin.calc_aa(Q0, q, self.Conn, self.Prop)
+        self.RR = kin.calc_pos(R0, self.AA, q, self.Conn, self.Prop)
+        self.vv, self.ww = kin.calc_vel(self.AA, q, self.Yd, self.Conn, self.Prop)
+        self.vd, self.wd = kin.calc_acc(self.AA, self.ww, q, qd, Ydd, self.Conn, self.Prop)
 
     def calc_CoM(self):
         """

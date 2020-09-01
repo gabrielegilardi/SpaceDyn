@@ -18,8 +18,8 @@ def calc_je(ie, RR, AA, q, Conn, Prop):
     """
     Returns the Jacobian (6 x num_j) of the endpoint <ie> (eqs 3.25 and 3.26).
     """
-    SE, BB, j_type = [Conn[i] for i in (1, 2, 3)]
-    cc, ce = [Prop[i] for i in (2, 3)]
+    SE, BB, j_type = Conn[1], Conn[2], Conn[3]
+    cc, ce = Prop[2], Prop[3]
     
     # Link sequence from the base (excluded) to the endpoint
     seq_link = []
@@ -64,7 +64,7 @@ def calc_je(ie, RR, AA, q, Conn, Prop):
     return Jacobian
 
 
-def calc_aa(A0, q, Conn, Prop):
+def calc_aa(Q0, q, Conn, Prop):
     """
     Returns the rotation matrices of all bodies with respect to the inertial
     frame.
@@ -74,7 +74,7 @@ def calc_aa(A0, q, Conn, Prop):
     Note: for the links the centroid frame and the corresponding joint frame
           are always parallel.
     """
-    BB, j_type = [Conn[i] for i in (2, 3)]
+    BB, j_type = Conn[2], Conn[3]
     Qi = Prop[4]
 
     num_j = len(q)                      # Number of joints/links
@@ -83,7 +83,7 @@ def calc_aa(A0, q, Conn, Prop):
     AA = np.zeros((3, 3*num_b))
 
     # Base
-    AA[:, 0:3] = A0
+    AA[:, 0:3] = rpy2dc(Q0).T
 
     # i = current link, k = lower link connection
     for i in range(1, num_b):
@@ -113,7 +113,7 @@ def calc_pos(R0, AA, q, Conn, Prop):
 
     RR = [RR_0, RR_1, ... ]         (3, num_b)
     """
-    BB, j_type = [Conn[i] for i in (2, 3)]
+    BB, j_type = Conn[2], Conn[3]
     cc = Prop[2]
 
     num_j = len(q)                      # Number of joints/links
@@ -146,7 +146,7 @@ def calc_pos(R0, AA, q, Conn, Prop):
     return RR
 
 
-def calc_vel(AA, v0, w0, q, qd, Conn, Prop):
+def calc_vel(AA, q, Yd, Conn, Prop):
     """
     Returns the linear velocity of all body centroids and the angular velocity
     of all body (eqs. 3.8-3.9 and 3.12-3.13, figure 3.5).
@@ -154,8 +154,9 @@ def calc_vel(AA, v0, w0, q, qd, Conn, Prop):
     vv = [vv_0, vv_1, ... ]         (3, num_b)
     ww = [ww_0, ww_1, ... ]         (3, num_b)
     """
-    BB, j_type = [Conn[i] for i in (2, 3)]
+    BB, j_type = Conn[2], Conn[3]
     cc = Prop[2]
+    v0, w0, qd = Yd[0:3], Yd[3:6], Yd[6:]
 
     num_b = len(q) + 1                   # Number of bodies
     Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
@@ -201,7 +202,7 @@ def calc_vel(AA, v0, w0, q, qd, Conn, Prop):
     return vv, ww
 
 
-def calc_acc(AA, ww, vd0, wd0, q, qd, qdd, Conn, Prop):
+def calc_acc(AA, ww, q, qd, Ydd, Conn, Prop):
     """
     Returns the linear acceleration of all body centroids and the angular
     acceleration of all body (eqs. 3.10-3.11 and 3.14-3.15, figure 3.5).
@@ -209,8 +210,9 @@ def calc_acc(AA, ww, vd0, wd0, q, qd, qdd, Conn, Prop):
     vd = [vd_0, vd_1, ... ]         (3, num_b)
     wd = [wd_0, wd_1, ... ]         (3, num_b)
     """
-    BB, j_type = [Conn[i] for i in (2, 3)]
+    BB, j_type = Conn[2], Conn[3]
     cc = Prop[2]
+    vd0, wd0, qdd = Ydd[0:3], Ydd[3:6], Ydd[6:]
 
     num_b = len(q) + 1                   # Number of bodies
     Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
@@ -268,7 +270,7 @@ def calc_jac(RR, AA, Conn, Prop):
     Returns the translational Jacobians (3 x num_j x num_j) of all link
     centroids (equation 3.25-3.26).
     """
-    BB, j_type = [Conn[i] for i in (2, 3)]
+    BB, j_type = Conn[2], Conn[3]
     cc = Prop[2]
 
     num_j = len(j_type)                     # Number of joints/links
@@ -313,7 +315,7 @@ def calc_hh(RR, AA, Conn, Prop):
 
     Subscripts: b = base, q = joints, w = base orientation, r = base position
     """
-    mass, inertia = [Prop[i] for i in (0, 1)]
+    mass, inertia = Prop[0], Prop[1]
 
     num_b = len(mass)               # Number of bodies
     num_j = num_b - 1               # Number of joints/links

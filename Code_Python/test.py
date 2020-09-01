@@ -91,21 +91,20 @@ ee = {
     2: (0, [0.0,  0.0,  0.0], [0.0,  0.0,  0.0], 'I')
     }
 bodies = [foot, leg, trunk, upperArm, lowerArm]
-robot = element.model(name=name, bodies=bodies, ee=ee, load='example')
+robot = element.model(name=name, bodies=bodies, ee=ee, load='full_system')
 R0 = np.array([1.0, 2.0, 3.0])
 Q0 = np.array([0.1, 0.2, 0.3])
-A0 = utils.rpy2dc(Q0).T
 v0 = np.array([1.3, -2.2, 3.7])
 w0 = np.array([-0.2, 0.5, -0.4])
 q = np.array([0.1, 0.5, 1.0, 1.5])
 qd = np.array([-0.1, 0.2, -0.3, 0.4])
-robot.set_init(R0=R0, A0=A0, v0=v0, w0=w0, q=q, qd=qd)
+robot.set_init(R0=R0, Q0=Q0, v0=v0, w0=w0, q=q, qd=qd)
 
 # ee = {
 #     0: (0, [0.0, 0.0, 0.0], [0.0,  0.0, 0.0], 'I'),
 #     }
 # bodies = [foot]
-# robot = element.model(name=name, bodies=bodies, ee=ee, load='example')
+# robot = element.model(name=name, bodies=bodies, ee=ee, load='base_only')
 # robot.set_init()
 
 
@@ -114,8 +113,7 @@ ts = 0.0
 tf = 1.0
 dt = 0.01
 rec = 0.1
-load = 'example'
-robot.simulate(ts=ts, tf=tf, dt=dt, rec=rec, solver='rk')
+robot.simulate(ts=ts, tf=tf, dt=dt, rec=rec, solver='nb')
 
 aa = robot.res
 plt.subplot(221)
