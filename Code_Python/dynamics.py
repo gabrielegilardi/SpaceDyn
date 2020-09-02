@@ -10,9 +10,11 @@ Python version of:
 """
 
 import numpy as np
+from kinematics import calc_aa, calc_pos, calc_vel, calc_acc, calc_hh, calc_je
+from utils import cross, tilde, rpy2dc, dc2rpy
 
-import kinematics as kin
-from utils import cross, rotW, tilde, rpy2dc, dc2rpy
+# Joint axis direction
+Ez = np.array([0.0, 0.0, 1.0])
 
 
 def r_ne(RR, AA, q, Yd, Ydd, Fe, Te, Conn, Prop):
@@ -32,20 +34,19 @@ def r_ne(RR, AA, q, Yd, Ydd, Fe, Te, Conn, Prop):
     torque/forces <tau> on the joints.
     """
     SS, SE, j_type = Conn[0], Conn[1], Conn[3]
-    mass, inertia, cc, ce, Qe = Prop[0], Prop[1], Prop[2], Prop[3], Prop[5]
+    mass, inertia, cc, ce, Qe, gravity = \
+        Prop[0], Prop[1], Prop[2], Prop[3], Prop[5], Prop[6]
     qd = Yd[6:]
 
     num_j = len(q)              # Number of joints/links
     num_b = num_j + 1           # Number of bodies
     num_e = SE.shape[1]         # Number of endpoints
-    Ez = np.array([0.0, 0.0, 1.0])              # Joint axis direction
-    Gravity = np.array([0.0, 0.0, -9.81])       # Gravity vector
 
     # Linear and angular velocities of all bodies
-    vv, ww = kin.calc_vel(AA, q, Yd, Conn, Prop)
+    vv, ww = calc_vel(AA, q, Yd, Conn, Prop)
 
     # Linear and angular accelerations of all bodies
-    vd, wd = kin.calc_acc(AA, ww, q, qd, Ydd, Conn, Prop)
+    vd, wd = calc_acc(AA, ww, q, qd, Ydd, Conn, Prop)
 
     # Inertial forces and moments on the body centroids (for convenience the
     # the gravitational force is also included here) - eqs. 3.30-3.31
@@ -57,7 +58,7 @@ def r_ne(RR, AA, q, Yd, Ydd, Fe, Te, Conn, Prop):
         In_I_i = A_I_i @ inertia[:, 3*i:3*(i+1)] @ A_I_i.T
 
         # Eq. 3.30 and 3.31
-        F_in[:, i] = mass[i] * (vd[:, i] - Gravity)
+        F_in[:, i] = mass[i] * (vd[:, i] - gravity)
         T_in[:, i] = In_I_i @ wd[:, i] + cross(ww[:, i], (In_I_i @ ww[:, i]))
 
     # Forces and moments on the joints (eqs. 3.32-3.35)
@@ -187,12 +188,11 @@ def f_dyn(Y, Yd, Fe, Te, tau, Conn, Prop):
     """
     Forward dynamics computation (chapter 3.6).
 
-    Given:
-    state                               R0, A0, v0, w0, q, qd
-    external forces and moments         Fe, Te, tau
+    state at time <t>           Y = [R0, A0, q] & Yd = [v0, w0, qd] @ <t>
+    external load               Fe, Te, tau
 
     Returns:
-    accelerations                       vd0, wd0, qdd
+    accelerations               Ydd = [vd0, wd0, qdd] @ <t>
 
     i.e. the system linear and angular accelerations (base + joints).
     """
@@ -203,14 +203,13 @@ def f_dyn(Y, Yd, Fe, Te, tau, Conn, Prop):
 
     num_j = len(q)                              # Number of joints/links
     num_e = SE.shape[1]                         # Number of endpoints
-    Ez = np.array([0.0, 0.0, 1.0])              # Joint axis direction
 
     # Position and rotation matrices
-    AA = kin.calc_aa(Q0, q, Conn, Prop)
-    RR = kin.calc_pos(R0, AA, q, Conn, Prop)
+    AA = calc_aa(Q0, q, Conn, Prop)
+    RR = calc_pos(R0, AA, q, Conn, Prop)
 
     # Inertia matrice
-    HH = kin.calc_hh(RR, AA, Conn, Prop)
+    HH = calc_hh(RR, AA, Conn, Prop)
 
     # Calculation of velocity dependent terms using the recursive Newton-Eulero
     # inverse dynamics setting to zero all accelerations and forces
@@ -260,7 +259,7 @@ def f_dyn(Y, Yd, Fe, Te, tau, Conn, Prop):
         if (i > 0):
 
             # Endpoint Jacobian - shape is (6 x num_j)
-            JJ_tmp = kin.calc_je(ie, RR, AA, q, Conn, Prop)
+            JJ_tmp = calc_je(ie, RR, AA, q, Conn, Prop)
             JJ_tx_i = JJ_tmp[0:3, :]        # Translational component
             JJ_rx_i = JJ_tmp[3:6, :]        # Rotational component
 
@@ -286,9 +285,9 @@ def f_dyn(Y, Yd, Fe, Te, tau, Conn, Prop):
     Force_ee = np.block([Fx, Tx, taux])
 
     # Calculate the accelerations - eq. 3.29
-    acc = np.linalg.inv(HH) @ (Force + Force_ee - Force0)
+    Ydd = np.linalg.inv(HH) @ (Force + Force_ee - Force0)
 
-    return acc
+    return Ydd
 
 
 def f_dyn_rk(dt, Y, Yd, Fe, Te, tau, Conn, Prop):
@@ -339,7 +338,7 @@ def f_dyn_rk(dt, Y, Yd, Fe, Te, tau, Conn, Prop):
     return Y_p, Yd_p
 
 
-def f_dyn_nb(dt, Y, Yd, Fe, Te, tau, Conn, Prop):
+def f_dyn_nb(dt, Y, Yd, Fe, Te, tau, Conn, Prop, Params):
     """
     Integration of the equations of motion using the Newmark-beta method and
     the Rodrigues formula to update the rotations.
@@ -360,9 +359,7 @@ def f_dyn_nb(dt, Y, Yd, Fe, Te, tau, Conn, Prop):
     - stability for any <dt> requires beta >= 1/4. ??????? (or is it <= ?)
     """
     # Newmark parameters
-    n_reps = 10
-    beta = 1.0 / 6.0
-    gamma = 0.5
+    reps, beta, gamma = Params['reps'], Params['beta'], Params['gamma']
 
     # Accelerations
     Ydd = f_dyn(Y, Yd, Fe, Te, tau, Conn, Prop)
@@ -377,7 +374,7 @@ def f_dyn_nb(dt, Y, Yd, Fe, Te, tau, Conn, Prop):
     Y_p[3:6] = dc2rpy(A0_p.T)
 
     # Correction
-    for i in range(n_reps):
+    for i in range(reps):
 
         # Accelerations using the predicted state
         Ydd_p = f_dyn(Y_p, Yd_p, Fe, Te, tau, Conn, Prop)

@@ -10,8 +10,10 @@ Python version of:
 """
 
 import numpy as np
-
 from utils import rpy2dc, cross, tilde
+
+# Joint axis direction
+Ez = np.array([0.0, 0.0, 1.0])
 
 
 def calc_je(ie, RR, AA, q, Conn, Prop):
@@ -37,7 +39,6 @@ def calc_je(ie, RR, AA, q, Conn, Prop):
     n_links = len(seq_link)
     POS_jnt = np.zeros((3, n_links))
     Jacobian = np.zeros((6, len(q)))
-    Ez = np.array([0.0, 0.0, 1.0])
     for i in range(n_links):
 
         j = seq_link[i]             # Joint/link number in the sequence
@@ -79,7 +80,6 @@ def calc_aa(Q0, q, Conn, Prop):
 
     num_j = len(q)                      # Number of joints/links
     num_b = num_j + 1                   # Number of bodies
-    Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
     AA = np.zeros((3, 3*num_b))
 
     # Base
@@ -118,7 +118,6 @@ def calc_pos(R0, AA, q, Conn, Prop):
 
     num_j = len(q)                      # Number of joints/links
     num_b = num_j + 1                   # Number of bodies
-    Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
     RR = np.zeros((3, num_b))
 
     # Base
@@ -159,7 +158,6 @@ def calc_vel(AA, q, Yd, Conn, Prop):
     v0, w0, qd = Yd[0:3], Yd[3:6], Yd[6:]
 
     num_b = len(q) + 1                   # Number of bodies
-    Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
     vv = np.zeros((3, num_b))
     ww = np.zeros((3, num_b))
 
@@ -215,7 +213,6 @@ def calc_acc(AA, ww, q, qd, Ydd, Conn, Prop):
     vd0, wd0, qdd = Ydd[0:3], Ydd[3:6], Ydd[6:]
 
     num_b = len(q) + 1                   # Number of bodies
-    Ez = np.array([0.0, 0.0, 1.0])      # Joint axis direction
     vd = np.zeros((3, num_b))
     wd = np.zeros((3, num_b))
 
@@ -274,7 +271,6 @@ def calc_jac(RR, AA, Conn, Prop):
     cc = Prop[2]
 
     num_j = len(j_type)                     # Number of joints/links
-    Ez = np.array([0.0, 0.0, 1.0])          # Joint axis direction
     JJ_t = np.zeros((3, num_j*num_j))
     JJ_r = np.zeros((3, num_j*num_j))
 

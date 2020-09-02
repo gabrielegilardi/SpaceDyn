@@ -11,10 +11,8 @@ Python version of:
 
 import numpy as np
 
-import kinematics as kin
 
-
-def calc_forces(time=0.0, num_j=0, num_e=0, load=None):
+def calc_load(time=0.0, num_j=0, num_e=0, load=None):
     """
     Returns any external/control force/moment applied to the bodies.
 

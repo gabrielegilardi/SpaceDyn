@@ -11,10 +11,10 @@ Python version of:
 
 import numpy as np
 
-import kinematics as kin
-import dynamics as dyn
+from kinematics import calc_aa, calc_pos, calc_vel, calc_acc
+from dynamics import f_dyn, f_dyn_nb, f_dyn_rk
 from utils import cross, rpy2dc, dc2rpy
-import user as user
+from user import calc_load
 
 
 def connectivity(bodies, ee):
@@ -214,7 +214,7 @@ class link:
 
 class model:
 
-    def __init__(self, name=None, bodies=[], ee={}, load=None):
+    def __init__(self, name=None, bodies=[], ee={}, load=None, param={}):
         """
         name        str         Name
         bodies      num_b       List of bodies
@@ -233,19 +233,33 @@ class model:
 
         # Connectivity
         SS, SE, BB = connectivity(self.bodies, self.ee)
-
-        # Links and endpoints relative positions/orientations
-        cc, Qi = build_cc_Qi(self.bodies)
-        ce, Qe = build_ce_Qe(self.ee)
+        j_type = build_j_type(self.joints)
+        self.Conn = [SS, SE, BB, j_type]
 
         # Properties
         mass, inertia = build_mass_inertia(self.bodies)
-        j_type = build_j_type(self.joints)
+        cc, Qi = build_cc_Qi(self.bodies)
+        ce, Qe = build_ce_Qe(self.ee)
+        self.Prop = [mass, inertia, cc, ce, Qi, Qe]
 
-        self.Conn = [SS, SE, BB, j_type]                # Connectivity list
-        self.Prop = [mass, inertia, cc, ce, Qi, Qe]     # Property list
-        self.Y = np.zeros(6+self.num_j)                 # State variables
-        self.Yd = np.zeros(6+self.num_j)                # State velocities
+        # State vectors
+        self.Y = np.zeros(6+self.num_j)
+        self.Yd = np.zeros(6+self.num_j)
+
+        # Options
+        self.Params = {
+            'solver': 'nb',
+            'reps': 10,
+            'beta': 1/6,
+            'gamma': 0.5,
+            'gravity': [0.0, 0.0, -9.80665]
+            }
+        for k, v in param.items():
+            self.Params[k] = v
+
+        # Append gravity to list Prop
+        self.Prop.append(np.asarray(self.Params['gravity']))        
+
 
     def info(self):
         """
@@ -278,7 +292,6 @@ class model:
 # Param: gravity, ... integrators parameters ..., other
 # State: RR, AA, vv, ww, vd, wd.
 # Load: Fe, Te, tau
-# Ydd = vd0, wd0, qdd
         
         self.Y[0:3] = np.asarray(R0)
         self.Y[3:6] = np.asarray(Q0)
@@ -290,23 +303,6 @@ class model:
         if (len(q) > 0):
             self.Yd[6:] = qd
 
-        # # Rotation matrices (link and joint frame are parallel)
-        # AA = kin.calc_aa(Q0, q, self.Conn, self.Prop)
-
-        # # Centroid positions
-        # RR = kin.calc_pos(R0, AA, q, self.Conn, self.Prop)
-
-        # # Centroid linear and angular velocities
-        # vv, ww = kin.calc_vel(AA, v0, w0, q, qd, self.Conn, self.Prop)
-
-        # # External forces
-        # Fe, Te, tau = user.calc_forces(t0, self.num_j, self.num_e, self.load)
-
-        # # Forward dynamics
-        # vd0, wd0, qdd = dyn.f_dyn(R0, A0, v0, w0, q, qd, Fe, Te, tau, self.Conn, self.Prop)
-
-        # # Centroid linear and angular accelerations
-        # vd, wd = kin.calc_acc(AA, ww, vd0, wd0, q, qd, qdd, self.Conn, self.Prop)
 
     def simulate(self, ts=0.0, tf=1.0, dt=0.001, rec=None, solver='nb'):
         """
@@ -314,8 +310,8 @@ class model:
         n_steps = int(np.round((tf - ts) / dt)) + 1
         self.res = np.zeros([n_steps, 5])
 
-        Fe, Te, tau = user.calc_forces(ts, self.num_j, self.num_e, self.load)
-        Ydd = dyn.f_dyn(self.Y, self.Yd, Fe, Te, tau, self.Conn, self.Prop)
+        Fe, Te, tau = calc_load(ts, self.num_j, self.num_e, self.load)
+        Ydd = f_dyn(self.Y, self.Yd, Fe, Te, tau, self.Conn, self.Prop)
 
         self.results(ts)
         i = 0
@@ -332,19 +328,20 @@ class model:
             self.res[i, 3] = self.Y[3]
             self.res[i, 4] = self.Yd[6]
 
+        solver = self.Params['solver']
         for i in range(1, n_steps):
             t = ts + float(i) * dt
-            Fe, Te, tau = user.calc_forces(t, self.num_j, self.num_e, self.load)
+            Fe, Te, tau = calc_load(t, self.num_j, self.num_e, self.load)
 
             # Solver using Runge-Kutta
             if (solver == 'rk'):
-                self.Y, self.Yd = dyn.f_dyn_rk(dt, self.Y, self.Yd, Fe, Te, tau,
+                self.Y, self.Yd = f_dyn_rk(dt, self.Y, self.Yd, Fe, Te, tau,
                                                self.Conn, self.Prop)
 
             # Solver using Newmark-beta
             elif (solver == 'nb'):
-                self.Y, self.Yd = dyn.f_dyn_nb(dt, self.Y, self.Yd, Fe, Te, tau,
-                                               self.Conn, self.Prop)
+                self.Y, self.Yd = f_dyn_nb(dt, self.Y, self.Yd, Fe, Te, tau,
+                                               self.Conn, self.Prop, self.Params)
 
             # Results (put in a separate function)
             self.res[i, 0] = t
@@ -369,13 +366,13 @@ class model:
         R0, Q0, q = self.Y[0:3], self.Y[3:6], self.Y[6:]
         qd = self.Yd[6:]
 
-        Fe, Te, tau = user.calc_forces(t, self.num_j, self.num_e, self.load)
-        Ydd = dyn.f_dyn(self.Y, self.Yd, Fe, Te, tau, self.Conn, self.Prop)
+        Fe, Te, tau = calc_load(t, self.num_j, self.num_e, self.load)
+        Ydd = f_dyn(self.Y, self.Yd, Fe, Te, tau, self.Conn, self.Prop)
 
-        self.AA = kin.calc_aa(Q0, q, self.Conn, self.Prop)
-        self.RR = kin.calc_pos(R0, self.AA, q, self.Conn, self.Prop)
-        self.vv, self.ww = kin.calc_vel(self.AA, q, self.Yd, self.Conn, self.Prop)
-        self.vd, self.wd = kin.calc_acc(self.AA, self.ww, q, qd, Ydd, self.Conn, self.Prop)
+        self.AA = calc_aa(Q0, q, self.Conn, self.Prop)
+        self.RR = calc_pos(R0, self.AA, q, self.Conn, self.Prop)
+        self.vv, self.ww = calc_vel(self.AA, q, self.Yd, self.Conn, self.Prop)
+        self.vd, self.wd = calc_acc(self.AA, self.ww, q, qd, Ydd, self.Conn, self.Prop)
 
     def calc_CoM(self):
         """
@@ -411,10 +408,9 @@ class model:
         """
         Returns the potential energy for the entire system and for each body.
         """
-        mass = self.Prop[0]
+        mass, gravity = self.Prop[0], self.Prop[6]
 
-        Gravity = np.array([0.0, 0.0, -9.81])       # Gravity vector
-        VG = - mass * (Gravity.T @ self.RR)
+        VG = - mass * (gravity.T @ self.RR)
 
         return VG.sum(), VG
 
@@ -424,7 +420,7 @@ class model:
         components - on the base, on the joints, on the endpoints).
         """
         # Evaluate external forces and moments
-        Fe, Te, tau = user.calc_forces(time, self.num_j, self.num_e, self.load)
+        Fe, Te, tau = calc_load(time, self.num_j, self.num_e, self.load)
 
         # Work done by the forces/moments on the endpoints (links and base)
         WK0 = 0      # will be added later
